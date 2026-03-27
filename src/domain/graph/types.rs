@@ -4,6 +4,9 @@ mod errors;
 mod model;
 #[path = "policy.rs"]
 mod policy;
+#[path = "tests_traversal.rs"]
+#[cfg(test)]
+mod tests_traversal;
 
 pub use errors::*;
 pub use model::*;
