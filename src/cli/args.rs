@@ -22,7 +22,6 @@ pub struct CliArgs {
 #[derive(Debug, Subcommand)]
 pub enum CliCommand {
     From(FromArgs),
-    Daemon(DaemonArgs),
     Gc,
     Doctor,
     Init,
@@ -61,17 +60,4 @@ pub enum FromArgsError {
     MissingTarget,
     #[error("Only one query target is allowed at a time")]
     MultipleTargets,
-}
-
-#[derive(Debug, Args)]
-pub struct DaemonArgs {
-    #[command(subcommand)]
-    pub action: DaemonCommand,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum DaemonCommand {
-    Start,
-    Stop,
-    Status,
 }

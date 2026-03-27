@@ -1,3 +1,3 @@
 pub mod cli;
 pub mod domain;
-pub mod use_case;
+pub mod ux_model;

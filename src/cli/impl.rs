@@ -1,6 +1,9 @@
 use clap::Parser;
+use thiserror::Error;
 
 use super::types::{CliArgs, FromArgs, FromArgsError, QueryTarget, ResolvedFromCommand};
+use crate::cli::CliCommand;
+use crate::ux_model::{FromTarget, UserCommand, UserMode, UserRequest};
 
 pub fn parse_cli() -> CliArgs {
     CliArgs::parse()
@@ -30,6 +33,44 @@ pub fn resolve_from_args(args: FromArgs) -> Result<ResolvedFromCommand, FromArgs
         }),
         _ => Err(FromArgsError::MultipleTargets),
     }
+}
+
+#[derive(Debug, Error)]
+pub enum IntentResolutionError {
+    #[error("Cannot resolve `from` command. Reason: {source}")]
+    InvalidFromCommand { source: FromArgsError },
+}
+
+pub fn resolve_intent(args: CliArgs) -> Result<UserRequest, IntentResolutionError> {
+    let mode = UserMode::Terminal;
+
+    let command = match args.command {
+        CliCommand::From(from_args) => {
+            let resolved = resolve_from_args(from_args)
+                .map_err(|source| IntentResolutionError::InvalidFromCommand { source })?;
+            let target = match resolved.target {
+                QueryTarget::Symbol(symbol) => FromTarget::Symbol(symbol),
+                QueryTarget::File(file) => FromTarget::File(file),
+                QueryTarget::Module(module) => FromTarget::Module(module),
+                QueryTarget::PublicExports => FromTarget::PublicExports,
+            };
+            UserCommand::From {
+                target,
+                depth: resolved.depth,
+            }
+        }
+        CliCommand::Gc => UserCommand::Gc,
+        CliCommand::Doctor => UserCommand::Doctor,
+        CliCommand::Init => UserCommand::Init,
+        CliCommand::Interactive => {
+            return Ok(UserRequest {
+                mode: UserMode::Interactive,
+                command: UserCommand::Interactive,
+            });
+        }
+    };
+
+    Ok(UserRequest { mode, command })
 }
 
 #[cfg(test)]
