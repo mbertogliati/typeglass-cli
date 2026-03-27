@@ -38,12 +38,28 @@ pub enum UserWorkspace {
     Pwd,
 }
 
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum UserCommand {
+pub struct UserCommand {
+    command_type: UserCommandType,
+    user_workspace: UserWorkspace,
+}
+
+impl UserCommand {
+    fn new(command_type: UserCommandType, user_workspace: UserWorkspace) -> Self {
+        Self {command_type, user_workspace}
+    }
+    
+    fn new_with_default_workspace(command_type: UserCommandType) -> Self {
+        Self::new(command_type, UserWorkspace::Pwd)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UserCommandType {
     From {
         target: FromTarget,
         depth: Option<u8>,
-        workspace: UserWorkspace,
     },
     Gc,
     Doctor,
@@ -102,24 +118,24 @@ impl UserRequest {
 }
 
 const fn goal_for_command(command: &UserCommand) -> UserGoal {
-    UserGoal(match command {
-        UserCommand::From => UserGoalType::UnderstandCodebaseDomain,
-        UserCommand::Gc => UserGoalType::KeepWorkspaceClean,
-        UserCommand::Doctor => UserGoalType::DiagnoseProblems,
-        UserCommand::Init => UserGoalType::PrepareWorkspace,
-        UserCommand::Interactive => UserGoalType::KeepAgentFlow,
+    UserGoal(match command.command_type {
+        UserCommandType::From => UserGoalType::UnderstandCodebaseDomain,
+        UserCommandType::Gc => UserGoalType::KeepWorkspaceClean,
+        UserCommandType::Doctor => UserGoalType::DiagnoseProblems,
+        UserCommandType::Init => UserGoalType::PrepareWorkspace,
+        UserCommandType::Interactive => UserGoalType::KeepAgentFlow,
     })
 }
 
 fn promises_for_command_success(command: &UserCommand) -> Vec<UserPromise> {
     let mut promises = vec![UserPromiseType::NeverSilentWrong];
 
-    match command {
-        UserCommand::From => {
+    match command.command_type {
+        UserCommandType::From => {
             promises.push(UserPromiseType::FastByDefault);
             promises.push(UserPromiseType::PartialResultsAreExplicit);
         }
-        UserCommand::Gc | UserCommand::Doctor | UserCommand::Init | UserCommand::Interactive => {
+        UserCommandType::Gc | UserCommandType::Doctor | UserCommandType::Init | UserCommandType::Interactive => {
             promises.push(UserPromiseType::FastByDefault);
         }
     }
