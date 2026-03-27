@@ -1,17 +1,19 @@
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug)]
 pub struct LspConnection {
     _private: (),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LspBinary {
     pub executable: String,
     pub version: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LspRequestId(pub(crate) String);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
