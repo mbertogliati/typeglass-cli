@@ -35,6 +35,132 @@ pub struct SourceLocation {
     pub column: u32,
 }
 
+/// Position in a source file (1-indexed)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Position {
+    pub line: u32,
+    pub column: u32,
+}
+
+impl Position {
+    pub fn new(line: u32, column: u32) -> Result<Self, PositionError> {
+        if line == 0 {
+            return Err(PositionError::InvalidLine { line });
+        }
+        if column == 0 {
+            return Err(PositionError::InvalidColumn { column });
+        }
+        Ok(Self { line, column })
+    }
+
+    pub fn at_line(line: u32) -> Result<Self, PositionError> {
+        Self::new(line, 1)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum PositionError {
+    #[error("Line must be greater than zero, got: {line}")]
+    InvalidLine { line: u32 },
+    #[error("Column must be greater than zero, got: {column}")]
+    InvalidColumn { column: u32 },
+}
+
+/// Precise range in source code (start to end)
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceRange {
+    pub file: PathBuf,
+    pub start: Position,
+    pub end: Position,
+}
+
+impl SourceRange {
+    pub fn new(file: PathBuf, start: Position, end: Position) -> Result<Self, SourceRangeError> {
+        if end < start {
+            return Err(SourceRangeError::EndBeforeStart { start, end });
+        }
+        Ok(Self { file, start, end })
+    }
+
+    pub fn single_line(
+        file: PathBuf,
+        line: u32,
+        start_col: u32,
+        end_col: u32,
+    ) -> Result<Self, SourceRangeError> {
+        let start = Position::new(line, start_col)
+            .map_err(|e| SourceRangeError::InvalidPosition { error: e })?;
+        let end = Position::new(line, end_col)
+            .map_err(|e| SourceRangeError::InvalidPosition { error: e })?;
+        Self::new(file, start, end)
+    }
+
+    pub fn contains(&self, pos: &Position) -> bool {
+        self.start <= *pos && *pos <= self.end
+    }
+
+    pub fn overlaps(&self, other: &SourceRange) -> bool {
+        if self.file != other.file {
+            return false;
+        }
+        !(self.end < other.start || other.end < self.start)
+    }
+
+    pub fn line_count(&self) -> u32 {
+        self.end.line.saturating_sub(self.start.line) + 1
+    }
+
+    pub fn is_single_line(&self) -> bool {
+        self.start.line == self.end.line
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SourceRangeError {
+    #[error("Invalid position: {error}")]
+    InvalidPosition { error: PositionError },
+    #[error("End position {end:?} is before start position {start:?}")]
+    EndBeforeStart { start: Position, end: Position },
+}
+
+/// Source range with the actual text content
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CodeSpan {
+    pub range: SourceRange,
+    pub text: String,
+    pub context_before: Option<Vec<String>>,
+    pub context_after: Option<Vec<String>>,
+}
+
+impl CodeSpan {
+    pub fn new(range: SourceRange, text: String) -> Self {
+        Self {
+            range,
+            text,
+            context_before: None,
+            context_after: None,
+        }
+    }
+
+    pub fn with_context(
+        range: SourceRange,
+        text: String,
+        context_before: Vec<String>,
+        context_after: Vec<String>,
+    ) -> Self {
+        Self {
+            range,
+            text,
+            context_before: Some(context_before),
+            context_after: Some(context_after),
+        }
+    }
+
+    pub fn has_context(&self) -> bool {
+        self.context_before.is_some() || self.context_after.is_some()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SymbolKind {
     TypeAlias,
