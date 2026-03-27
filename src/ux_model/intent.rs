@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use enum_variant_type::EnumVariantType;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -38,7 +39,6 @@ pub enum UserWorkspace {
     Pwd,
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserCommand {
     command_type: UserCommandType,
@@ -47,15 +47,18 @@ pub struct UserCommand {
 
 impl UserCommand {
     fn new(command_type: UserCommandType, user_workspace: UserWorkspace) -> Self {
-        Self {command_type, user_workspace}
+        Self {
+            command_type,
+            user_workspace,
+        }
     }
-    
+
     fn new_with_default_workspace(command_type: UserCommandType) -> Self {
         Self::new(command_type, UserWorkspace::Pwd)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumVariantType)]
 pub enum UserCommandType {
     From {
         target: FromTarget,
@@ -80,7 +83,7 @@ impl UserCommand {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-enum FromTarget {
+pub enum FromTarget {
     Symbol(String),
     File(PathBuf),
     Module(PathBuf),
@@ -119,7 +122,7 @@ impl UserRequest {
 
 const fn goal_for_command(command: &UserCommand) -> UserGoal {
     UserGoal(match command.command_type {
-        UserCommandType::From => UserGoalType::UnderstandCodebaseDomain,
+        UserCommandType::From { .. } => UserGoalType::UnderstandCodebaseDomain,
         UserCommandType::Gc => UserGoalType::KeepWorkspaceClean,
         UserCommandType::Doctor => UserGoalType::DiagnoseProblems,
         UserCommandType::Init => UserGoalType::PrepareWorkspace,
@@ -131,16 +134,19 @@ fn promises_for_command_success(command: &UserCommand) -> Vec<UserPromise> {
     let mut promises = vec![UserPromiseType::NeverSilentWrong];
 
     match command.command_type {
-        UserCommandType::From => {
+        UserCommandType::From { .. } => {
             promises.push(UserPromiseType::FastByDefault);
             promises.push(UserPromiseType::PartialResultsAreExplicit);
         }
-        UserCommandType::Gc | UserCommandType::Doctor | UserCommandType::Init | UserCommandType::Interactive => {
+        UserCommandType::Gc
+        | UserCommandType::Doctor
+        | UserCommandType::Init
+        | UserCommandType::Interactive => {
             promises.push(UserPromiseType::FastByDefault);
         }
     }
 
-    promises.map(UserPromise::from)
+    promises.into_iter().map(UserPromise).collect()
 }
 
 fn promises_for_command_error(_command: &UserCommand) -> Vec<UserPromise> {
@@ -149,5 +155,7 @@ fn promises_for_command_error(_command: &UserCommand) -> Vec<UserPromise> {
         UserPromiseType::ErrorsAreExplicit,
         UserPromiseType::FastByDefault,
     ]
-    .map(UserPromise::from)
+    .into_iter()
+    .map(UserPromise)
+    .collect()
 }
