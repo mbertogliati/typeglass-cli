@@ -1,4 +1,4 @@
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -35,15 +35,15 @@ pub struct UserGoal(UserGoalType);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UserWorkspace {
     Explicit(PathBuf),
-    Pwd
+    Pwd,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-enum UserCommand {
+pub enum UserCommand {
     From {
         target: FromTarget,
         depth: Option<u8>,
-        workspace: UserWorkspace
+        workspace: UserWorkspace,
     },
     Gc,
     Doctor,
@@ -102,15 +102,13 @@ impl UserRequest {
 }
 
 const fn goal_for_command(command: &UserCommand) -> UserGoal {
-    UserGoal(
-        match command {
-            UserCommand::From => UserGoalType::UnderstandCodebaseDomain,
-            UserCommand::Gc => UserGoalType::KeepWorkspaceClean,
-            UserCommand::Doctor => UserGoalType::DiagnoseProblems,
-            UserCommand::Init => UserGoalType::PrepareWorkspace,
-            UserCommand::Interactive => UserGoalType::KeepAgentFlow,
-        }
-    )
+    UserGoal(match command {
+        UserCommand::From => UserGoalType::UnderstandCodebaseDomain,
+        UserCommand::Gc => UserGoalType::KeepWorkspaceClean,
+        UserCommand::Doctor => UserGoalType::DiagnoseProblems,
+        UserCommand::Init => UserGoalType::PrepareWorkspace,
+        UserCommand::Interactive => UserGoalType::KeepAgentFlow,
+    })
 }
 
 fn promises_for_command_success(command: &UserCommand) -> Vec<UserPromise> {
@@ -121,10 +119,7 @@ fn promises_for_command_success(command: &UserCommand) -> Vec<UserPromise> {
             promises.push(UserPromiseType::FastByDefault);
             promises.push(UserPromiseType::PartialResultsAreExplicit);
         }
-        UserCommand::Gc
-        | UserCommand::Doctor
-        | UserCommand::Init
-        | UserCommand::Interactive => {
+        UserCommand::Gc | UserCommand::Doctor | UserCommand::Init | UserCommand::Interactive => {
             promises.push(UserPromiseType::FastByDefault);
         }
     }
@@ -137,6 +132,6 @@ fn promises_for_command_error(_command: &UserCommand) -> Vec<UserPromise> {
         UserPromiseType::ErrorsAreActionable,
         UserPromiseType::ErrorsAreExplicit,
         UserPromiseType::FastByDefault,
-    ].map(UserPromise::from)
+    ]
+    .map(UserPromise::from)
 }
-

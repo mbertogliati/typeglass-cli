@@ -1,8 +1,10 @@
+mod application;
 mod cli;
 mod domain;
 mod ux_model;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
     let args = cli::parse_cli();
@@ -14,13 +16,18 @@ fn main() {
         }
     };
 
-    let intent_contract = ux_model::UserIntentContract::from_request(&request);
-    let outcome_contract = ux_model::outcome_contract_for_command(intent_contract.command);
+    let response = application::ApplicationService::new(application::UnwiredAdapters)
+        .execute(request)
+        .await;
+    let expectations = response.user_expectations();
+    let user_result = response.user_result();
 
     match serde_json::to_string_pretty(&serde_json::json!({
-        "intent_request": request,
-        "intent_contract": intent_contract,
-        "outcome_contract": outcome_contract,
+        "request": format!("{:#?}", response.request),
+        "intent_contract": format!("{:#?}", response.intent_contract),
+        "expectations": format!("{:#?}", expectations),
+        "command_result": format!("{:#?}", response.result),
+        "user_result": format!("{:#?}", user_result),
     })) {
         Ok(payload) => println!("{payload}"),
         Err(error) => {
