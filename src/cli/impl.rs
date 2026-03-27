@@ -3,8 +3,10 @@ use thiserror::Error;
 
 use super::types::{CliArgs, FromArgs, FromArgsError, QueryTarget, ResolvedFromCommand};
 use crate::cli::CliCommand;
-use crate::ux_model::UserCommand;
-use crate::ux_model::UserRequest;
+use crate::ux_model::intent::{
+    UserCommandContext, UserCommandDoctor, UserCommandFrom, UserCommandGc, UserCommandInit,
+    UserCommandInteractive, UserWorkspace,
+};
 
 pub fn parse_cli() -> CliArgs {
     CliArgs::parse()
@@ -42,27 +44,44 @@ pub enum IntentResolutionError {
     InvalidFromCommand { source: FromArgsError },
 }
 
+pub enum UserRequest {
+    From(crate::ux_model::intent::UserRequest<UserCommandFrom>),
+    Gc(crate::ux_model::intent::UserRequest<UserCommandGc>),
+    Doctor(crate::ux_model::intent::UserRequest<UserCommandDoctor>),
+    Init(crate::ux_model::intent::UserRequest<UserCommandInit>),
+    Interactive(crate::ux_model::intent::UserRequest<UserCommandInteractive>),
+}
+
 pub fn resolve_intent(args: CliArgs) -> Result<UserRequest, IntentResolutionError> {
-    let command = match args.command {
+    let context = UserCommandContext {
+        user_workspace: UserWorkspace::Pwd,
+    };
+
+    match args.command {
         CliCommand::From(from_args) => {
             let resolved = resolve_from_args(from_args)
                 .map_err(|source| IntentResolutionError::InvalidFromCommand { source })?;
-            match resolved.target {
-                QueryTarget::Symbol(symbol) => UserCommand::from_symbol(symbol, resolved.depth),
-                QueryTarget::File(file) => UserCommand::from_file(file, resolved.depth),
-                QueryTarget::Module(module) => UserCommand::from_module(module, resolved.depth),
-                QueryTarget::PublicExports => UserCommand::from_public_exports(resolved.depth),
-            }
+            let cmd = match resolved.target {
+                QueryTarget::Symbol(symbol) => UserCommandFrom::symbol(symbol, resolved.depth),
+                QueryTarget::File(file) => UserCommandFrom::file(file, resolved.depth),
+                QueryTarget::Module(module) => UserCommandFrom::module(module, resolved.depth),
+                QueryTarget::PublicExports => UserCommandFrom::public_exports(resolved.depth),
+            };
+            Ok(UserRequest::From(crate::ux_model::intent::UserRequest::terminal(cmd, context)))
         }
-        CliCommand::Gc => UserCommand::gc(),
-        CliCommand::Doctor => UserCommand::doctor(),
-        CliCommand::Init => UserCommand::init(),
+        CliCommand::Gc => {
+            Ok(UserRequest::Gc(crate::ux_model::intent::UserRequest::terminal(UserCommandGc, context)))
+        }
+        CliCommand::Doctor => {
+            Ok(UserRequest::Doctor(crate::ux_model::intent::UserRequest::terminal(UserCommandDoctor, context)))
+        }
+        CliCommand::Init => {
+            Ok(UserRequest::Init(crate::ux_model::intent::UserRequest::terminal(UserCommandInit, context)))
+        }
         CliCommand::Interactive => {
-            return Ok(UserRequest::interactive(UserCommand::interactive()));
+            Ok(UserRequest::Interactive(crate::ux_model::intent::UserRequest::interactive(UserCommandInteractive, context)))
         }
-    };
-
-    Ok(UserRequest::terminal(command))
+    }
 }
 
 #[cfg(test)]

@@ -3,8 +3,7 @@ mod cli;
 mod domain;
 mod ux_model;
 
-use crate::ux_model::intent::UserCommandType;
-use crate::ux_model::UserRequest;
+use crate::cli::UserRequest;
 
 #[tokio::main]
 async fn main() {
@@ -19,20 +18,33 @@ async fn main() {
         }
     };
 
-    let command = request.into_command();
     let service = application::ApplicationService::new(application::UnwiredAdapters);
     
-    match command.command_type {
-        UserCommandType::From { .. } => {
-            let response = service.execute::<application::FromAction>(command).await;
+    match request {
+        UserRequest::From(req) => {
+            let (action, context) = req.into_parts();
+            let response = service.execute(action, context).await;
             print_response(response);
         }
-        UserCommandType::Gc => {
-            let response = service.execute::<application::GcAction>(command).await;
+        UserRequest::Gc(req) => {
+            let (action, context) = req.into_parts();
+            let response = service.execute(action, context).await;
             print_response(response);
         }
-        _ => {
-            println!("Command not yet implemented in main dispatcher");
+        UserRequest::Doctor(req) => {
+            let (action, context) = req.into_parts();
+            let response = service.execute(action, context).await;
+            print_response(response);
+        }
+        UserRequest::Init(req) => {
+            let (action, context) = req.into_parts();
+            let response = service.execute(action, context).await;
+            print_response(response);
+        }
+        UserRequest::Interactive(req) => {
+            let (action, context) = req.into_parts();
+            let response = service.execute(action, context).await;
+            print_response(response);
         }
     }
 }

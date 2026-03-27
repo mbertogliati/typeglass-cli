@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Debug, path::PathBuf};
 
-use super::intent::{UserCommand, UserGoal, UserPromise};
+use super::intent::{UserCommandContext, UserGoal, UserPromise};
 
 pub trait SuccessUserExpectations: Debug {
     fn goal(&self) -> UserGoal;
@@ -44,8 +44,7 @@ pub struct UserNextStep(pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserResultContext {
-    pub original_command: UserCommand,
-    
+    pub command_context: UserCommandContext,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

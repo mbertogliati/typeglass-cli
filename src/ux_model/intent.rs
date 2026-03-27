@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use enum_variant_type::EnumVariantType;
+use sealed::sealed;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -19,7 +19,7 @@ pub enum UserPromiseType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct UserPromise(UserPromiseType);
+pub struct UserPromise(pub UserPromiseType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum UserGoalType {
@@ -31,7 +31,7 @@ pub enum UserGoalType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct UserGoal(UserGoalType);
+pub struct UserGoal(pub UserGoalType);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UserWorkspace {
@@ -40,91 +40,75 @@ pub enum UserWorkspace {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UserCommand {
-    pub command_type: UserCommandType,
+pub struct UserCommandContext {
     pub user_workspace: UserWorkspace,
 }
 
-impl UserCommand {
-    fn new(command_type: UserCommandType, user_workspace: UserWorkspace) -> Self {
+#[sealed]
+pub trait UserCommand {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserCommandFrom {
+    pub target: FromTarget,
+    pub depth: Option<u8>,
+}
+
+#[sealed]
+impl UserCommand for UserCommandFrom {}
+
+impl UserCommandFrom {
+    pub fn symbol(symbol: String, depth: Option<u8>) -> Self {
         Self {
-            command_type,
-            user_workspace,
+            target: FromTarget::Symbol(symbol),
+            depth,
         }
     }
 
-    fn new_with_default_workspace(command_type: UserCommandType) -> Self {
-        Self::new(command_type, UserWorkspace::Pwd)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumVariantType)]
-pub enum UserCommandType {
-    From {
-        target: FromTarget,
-        depth: Option<u8>,
-    },
-    Gc,
-    Doctor,
-    Init,
-    Interactive,
-}
-
-impl UserCommand {
-    pub fn from_symbol(symbol: String, depth: Option<u8>) -> Self {
-        Self::new_with_default_workspace(UserCommandType::From {
-            target: FromTarget::Symbol(symbol),
-            depth,
-        })
-    }
-
-    pub fn from_file(file: PathBuf, depth: Option<u8>) -> Self {
-        Self::new_with_default_workspace(UserCommandType::From {
+    pub fn file(file: PathBuf, depth: Option<u8>) -> Self {
+        Self {
             target: FromTarget::File(file),
             depth,
-        })
+        }
     }
 
-    pub fn from_module(module: PathBuf, depth: Option<u8>) -> Self {
-        Self::new_with_default_workspace(UserCommandType::From {
+    pub fn module(module: PathBuf, depth: Option<u8>) -> Self {
+        Self {
             target: FromTarget::Module(module),
             depth,
-        })
+        }
     }
 
-    pub fn from_public_exports(depth: Option<u8>) -> Self {
-        Self::new_with_default_workspace(UserCommandType::From {
+    pub fn public_exports(depth: Option<u8>) -> Self {
+        Self {
             target: FromTarget::PublicExports,
             depth,
-        })
-    }
-
-    pub fn gc() -> Self {
-        Self::new_with_default_workspace(UserCommandType::Gc)
-    }
-
-    pub fn doctor() -> Self {
-        Self::new_with_default_workspace(UserCommandType::Doctor)
-    }
-
-    pub fn init() -> Self {
-        Self::new_with_default_workspace(UserCommandType::Init)
-    }
-
-    pub fn interactive() -> Self {
-        Self::new_with_default_workspace(UserCommandType::Interactive)
-    }
-
-    pub const fn goal(&self) -> UserGoal {
-        goal_for_command(self)
-    }
-    pub fn success_promises(&self) -> Vec<UserPromise> {
-        promises_for_command_success(self)
-    }
-    pub fn error_promises(&self) -> Vec<UserPromise> {
-        promises_for_command_error(self)
+        }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserCommandGc;
+
+#[sealed]
+impl UserCommand for UserCommandGc {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserCommandDoctor;
+
+#[sealed]
+impl UserCommand for UserCommandDoctor {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserCommandInit;
+
+#[sealed]
+impl UserCommand for UserCommandInit {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserCommandInteractive;
+
+#[sealed]
+impl UserCommand for UserCommandInteractive {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FromTarget {
@@ -135,23 +119,26 @@ pub enum FromTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UserRequest {
-    mode: UserMode,
-    command: UserCommand,
+pub struct UserRequest<C: UserCommand> {
+    pub mode: UserMode,
+    pub command: C,
+    pub context: UserCommandContext,
 }
 
-impl UserRequest {
-    pub fn terminal(command: UserCommand) -> Self {
+impl<C: UserCommand> UserRequest<C> {
+    pub fn terminal(command: C, context: UserCommandContext) -> Self {
         Self {
             mode: UserMode::Terminal,
             command,
+            context,
         }
     }
 
-    pub fn interactive(command: UserCommand) -> Self {
+    pub fn interactive(command: C, context: UserCommandContext) -> Self {
         Self {
             mode: UserMode::Interactive,
             command,
+            context,
         }
     }
 
@@ -159,12 +146,16 @@ impl UserRequest {
         self.mode
     }
 
-    pub fn command(&self) -> &UserCommand {
+    pub fn command(&self) -> &C {
         &self.command
     }
 
-    pub fn into_command(self) -> UserCommand {
-        self.command
+    pub fn context(&self) -> &UserCommandContext {
+        &self.context
+    }
+
+    pub fn into_parts(self) -> (C, UserCommandContext) {
+        (self.command, self.context)
     }
 }
 
@@ -174,36 +165,7 @@ impl std::convert::From<UserGoalType> for UserGoal {
     }
 }
 
-const fn goal_for_command(command: &UserCommand) -> UserGoal {
-    UserGoal(match command.command_type {
-        UserCommandType::From { .. } => UserGoalType::UnderstandCodebaseDomain,
-        UserCommandType::Gc => UserGoalType::KeepWorkspaceClean,
-        UserCommandType::Doctor => UserGoalType::DiagnoseProblems,
-        UserCommandType::Init => UserGoalType::PrepareWorkspace,
-        UserCommandType::Interactive => UserGoalType::KeepAgentFlow,
-    })
-}
-
-fn promises_for_command_success(command: &UserCommand) -> Vec<UserPromise> {
-    let mut promises = vec![UserPromiseType::NeverSilentWrong];
-
-    match command.command_type {
-        UserCommandType::From { .. } => {
-            promises.push(UserPromiseType::FastByDefault);
-            promises.push(UserPromiseType::PartialResultsAreExplicit);
-        }
-        UserCommandType::Gc
-        | UserCommandType::Doctor
-        | UserCommandType::Init
-        | UserCommandType::Interactive => {
-            promises.push(UserPromiseType::FastByDefault);
-        }
-    }
-
-    promises.into_iter().map(UserPromise).collect()
-}
-
-fn promises_for_command_error(_command: &UserCommand) -> Vec<UserPromise> {
+pub fn promises_for_generic_error() -> Vec<UserPromise> {
     vec![
         UserPromiseType::ErrorsAreActionable,
         UserPromiseType::ErrorsAreExplicit,
