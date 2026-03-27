@@ -18,7 +18,7 @@ pub enum UserPromiseType {
     ErrorsAreExplicit,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UserPromise(UserPromiseType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -30,7 +30,7 @@ pub enum UserGoalType {
     KeepAgentFlow,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UserGoal(UserGoalType);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,8 +41,8 @@ pub enum UserWorkspace {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserCommand {
-    command_type: UserCommandType,
-    user_workspace: UserWorkspace,
+    pub command_type: UserCommandType,
+    pub user_workspace: UserWorkspace,
 }
 
 impl UserCommand {
@@ -71,6 +71,50 @@ pub enum UserCommandType {
 }
 
 impl UserCommand {
+    pub fn from_symbol(symbol: String, depth: Option<u8>) -> Self {
+        Self::new_with_default_workspace(UserCommandType::From {
+            target: FromTarget::Symbol(symbol),
+            depth,
+        })
+    }
+
+    pub fn from_file(file: PathBuf, depth: Option<u8>) -> Self {
+        Self::new_with_default_workspace(UserCommandType::From {
+            target: FromTarget::File(file),
+            depth,
+        })
+    }
+
+    pub fn from_module(module: PathBuf, depth: Option<u8>) -> Self {
+        Self::new_with_default_workspace(UserCommandType::From {
+            target: FromTarget::Module(module),
+            depth,
+        })
+    }
+
+    pub fn from_public_exports(depth: Option<u8>) -> Self {
+        Self::new_with_default_workspace(UserCommandType::From {
+            target: FromTarget::PublicExports,
+            depth,
+        })
+    }
+
+    pub fn gc() -> Self {
+        Self::new_with_default_workspace(UserCommandType::Gc)
+    }
+
+    pub fn doctor() -> Self {
+        Self::new_with_default_workspace(UserCommandType::Doctor)
+    }
+
+    pub fn init() -> Self {
+        Self::new_with_default_workspace(UserCommandType::Init)
+    }
+
+    pub fn interactive() -> Self {
+        Self::new_with_default_workspace(UserCommandType::Interactive)
+    }
+
     pub const fn goal(&self) -> UserGoal {
         goal_for_command(self)
     }
@@ -115,8 +159,18 @@ impl UserRequest {
         self.mode
     }
 
-    pub const fn command(&self) -> &UserCommand {
+    pub fn command(&self) -> &UserCommand {
         &self.command
+    }
+
+    pub fn into_command(self) -> UserCommand {
+        self.command
+    }
+}
+
+impl std::convert::From<UserGoalType> for UserGoal {
+    fn from(value: UserGoalType) -> Self {
+        Self(value)
     }
 }
 

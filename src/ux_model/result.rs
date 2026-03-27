@@ -1,8 +1,8 @@
-use std::{error::Error, path::PathBuf};
+use std::{error::Error, fmt::Debug, path::PathBuf};
 
 use super::intent::{UserCommand, UserGoal, UserPromise};
 
-pub trait SuccessUserExpectations {
+pub trait SuccessUserExpectations: Debug {
     fn goal(&self) -> UserGoal;
     fn promises(&self) -> Vec<UserPromise>;
     fn summary(&self) -> UserSummary;
@@ -10,7 +10,7 @@ pub trait SuccessUserExpectations {
     fn context(&self) -> UserResultContext;
 }
 
-pub trait FailureUserExpectations: Error {
+pub trait FailureUserExpectations: Error + Debug {
     fn promises(&self) -> Vec<UserPromise>;
     fn summary(&self) -> UserSummary;
     fn limitations(&self) -> Vec<UserLimitation>;
@@ -18,7 +18,7 @@ pub trait FailureUserExpectations: Error {
     fn context(&self) -> UserResultContext;
 }
 
-pub trait PartialSuccessUserExpectations {
+pub trait PartialSuccessUserExpectations: Debug {
     fn goal(&self) -> UserGoal;
     fn promises(&self) -> Vec<UserPromise>;
     fn summary(&self) -> UserSummary;
@@ -54,6 +54,7 @@ pub struct UserWorkspaceContext {
     pub override_path: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserResult<S, P, F>
 where
     S: SuccessUserExpectations,

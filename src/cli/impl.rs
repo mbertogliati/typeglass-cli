@@ -3,7 +3,8 @@ use thiserror::Error;
 
 use super::types::{CliArgs, FromArgs, FromArgsError, QueryTarget, ResolvedFromCommand};
 use crate::cli::CliCommand;
-use crate::ux_model::{FromTarget, UserCommand, UserMode, UserRequest};
+use crate::ux_model::UserCommand;
+use crate::ux_model::UserRequest;
 
 pub fn parse_cli() -> CliArgs {
     CliArgs::parse()
@@ -42,35 +43,26 @@ pub enum IntentResolutionError {
 }
 
 pub fn resolve_intent(args: CliArgs) -> Result<UserRequest, IntentResolutionError> {
-    let mode = UserMode::Terminal;
-
     let command = match args.command {
         CliCommand::From(from_args) => {
             let resolved = resolve_from_args(from_args)
                 .map_err(|source| IntentResolutionError::InvalidFromCommand { source })?;
-            let target = match resolved.target {
-                QueryTarget::Symbol(symbol) => FromTarget::Symbol(symbol),
-                QueryTarget::File(file) => FromTarget::File(file),
-                QueryTarget::Module(module) => FromTarget::Module(module),
-                QueryTarget::PublicExports => FromTarget::PublicExports,
-            };
-            UserCommand::From {
-                target,
-                depth: resolved.depth,
+            match resolved.target {
+                QueryTarget::Symbol(symbol) => UserCommand::from_symbol(symbol, resolved.depth),
+                QueryTarget::File(file) => UserCommand::from_file(file, resolved.depth),
+                QueryTarget::Module(module) => UserCommand::from_module(module, resolved.depth),
+                QueryTarget::PublicExports => UserCommand::from_public_exports(resolved.depth),
             }
         }
-        CliCommand::Gc => UserCommand::Gc,
-        CliCommand::Doctor => UserCommand::Doctor,
-        CliCommand::Init => UserCommand::Init,
+        CliCommand::Gc => UserCommand::gc(),
+        CliCommand::Doctor => UserCommand::doctor(),
+        CliCommand::Init => UserCommand::init(),
         CliCommand::Interactive => {
-            return Ok(UserRequest {
-                mode: UserMode::Interactive,
-                command: UserCommand::Interactive,
-            });
+            return Ok(UserRequest::interactive(UserCommand::interactive()));
         }
     };
 
-    Ok(UserRequest { mode, command })
+    Ok(UserRequest::terminal(command))
 }
 
 #[cfg(test)]
