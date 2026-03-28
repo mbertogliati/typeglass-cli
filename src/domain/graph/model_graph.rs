@@ -272,4 +272,147 @@ mod tests {
         };
         assert_eq!(u.symbol.0, "X");
     }
+    
+    #[test]
+    fn test_unresolve_reason_variants() {
+        assert_ne!(UnresolveReason::LspTimeout, UnresolveReason::SymbolNotFound);
+        
+        let file_err = UnresolveReason::FileNotAccessible { path: PathBuf::from("/test") };
+        match file_err {
+            UnresolveReason::FileNotAccessible { path } => assert_eq!(path, PathBuf::from("/test")),
+            _ => panic!("Expected FileNotAccessible"),
+        }
+        
+        let ambig = UnresolveReason::AmbiguousSymbol { candidates: vec![SymbolName("A".to_string())] };
+        match ambig {
+            UnresolveReason::AmbiguousSymbol { candidates } => assert_eq!(candidates.len(), 1),
+            _ => panic!("Expected AmbiguousSymbol"),
+        }
+    }
+    
+    #[test]
+    fn test_partial_graph_merge_with() {
+        let mut g1 = PartialGraph::new();
+        let mut g2 = PartialGraph::new();
+        
+        g1.nodes.insert(SymbolName("A".to_string()), TypeNode {
+            id: QualifiedSymbolName {
+                module_path: PathBuf::from("/test.rs"),
+                symbol: SymbolName("A".to_string()),
+            },
+            name: SymbolName("A".to_string()),
+            kind: SymbolKind::Struct,
+            origin: SymbolOrigin::Canonical,
+            location: SourceLocation {
+                file: PathBuf::from("/test.rs"),
+                line: 1,
+                column: 1,
+            },
+            language: Language::Rust,
+            generic_parameters: vec![],
+        });
+        
+        g2.nodes.insert(SymbolName("B".to_string()), TypeNode {
+            id: QualifiedSymbolName {
+                module_path: PathBuf::from("/test.rs"),
+                symbol: SymbolName("B".to_string()),
+            },
+            name: SymbolName("B".to_string()),
+            kind: SymbolKind::Enum,
+            origin: SymbolOrigin::Canonical,
+            location: SourceLocation {
+                file: PathBuf::from("/test.rs"),
+                line: 10,
+                column: 1,
+            },
+            language: Language::Rust,
+            generic_parameters: vec![],
+        });
+        
+        assert_eq!(g1.node_count(), 1);
+        g1.merge_with(g2);
+        assert_eq!(g1.node_count(), 2);
+    }
+    
+    #[test]
+    fn test_partial_graph_to_type_graph_lossy() {
+        let mut pg = PartialGraph::new();
+        pg.unresolved_references.push(UnresolvedReference {
+            symbol: SymbolName("X".to_string()),
+            referenced_from: SourceLocation {
+                file: PathBuf::from("/test.rs"),
+                line: 5,
+                column: 10,
+            },
+            reason: UnresolveReason::SymbolNotFound,
+        });
+        pg.partial_signals.push(PartialResultSignal {
+            reason: PartialResultReason::DepthLimitReached,
+            occurrences: 1,
+        });
+        
+        let tg = pg.to_type_graph_lossy();
+        assert_eq!(tg.warnings().len(), 1);
+        match &tg.warnings()[0] {
+            GraphWarning::UnresolvedReference { symbol, .. } => assert_eq!(symbol.0, "X"),
+            _ => panic!("Expected UnresolvedReference warning"),
+        }
+    }
+    
+    #[test]
+    fn test_partial_graph_counts() {
+        let mut pg = PartialGraph::new();
+        assert_eq!(pg.node_count(), 0);
+        assert_eq!(pg.edge_count(), 0);
+        assert_eq!(pg.unresolved_count(), 0);
+        
+        pg.unresolved_references.push(UnresolvedReference {
+            symbol: SymbolName("X".to_string()),
+            referenced_from: SourceLocation {
+                file: PathBuf::from("/test.rs"),
+                line: 1,
+                column: 1,
+            },
+            reason: UnresolveReason::SymbolNotFound,
+        });
+        
+        assert_eq!(pg.unresolved_count(), 1);
+    }
+    
+    #[test]
+    fn test_partial_result_signal() {
+        let sig = PartialResultSignal {
+            reason: PartialResultReason::LspIndexNotReady,
+            occurrences: 3,
+        };
+        assert_eq!(sig.occurrences, 3);
+        match sig.reason {
+            PartialResultReason::LspIndexNotReady => {},
+            _ => panic!("Expected LspIndexNotReady"),
+        }
+    }
+    
+    #[test]
+    fn test_graph_warning_variants() {
+        let circular = GraphWarning::CircularDependency {
+            cycle: vec![SymbolName("A".to_string()), SymbolName("B".to_string())],
+        };
+        match circular {
+            GraphWarning::CircularDependency { cycle } => assert_eq!(cycle.len(), 2),
+            _ => panic!("Expected CircularDependency"),
+        }
+        
+        let unresolved = GraphWarning::UnresolvedReference {
+            symbol: SymbolName("X".to_string()),
+            from: SourceLocation {
+                file: PathBuf::from("/test.rs"),
+                line: 1,
+                column: 1,
+            },
+        };
+        match unresolved {
+            GraphWarning::UnresolvedReference { symbol, .. } => assert_eq!(symbol.0, "X"),
+            _ => panic!("Expected UnresolvedReference"),
+        }
+    }
 }

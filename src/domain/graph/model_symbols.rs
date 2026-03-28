@@ -329,3 +329,332 @@ impl Default for CrossModuleReferenceGraph {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    fn test_symbol_name() -> SymbolName {
+        SymbolName("TestSymbol".to_string())
+    }
+    
+    fn test_qualified_name() -> QualifiedSymbolName {
+        QualifiedSymbolName {
+            module_path: PathBuf::from("/test/module.rs"),
+            symbol: test_symbol_name(),
+        }
+    }
+    
+    fn test_source_location() -> SourceLocation {
+        SourceLocation {
+            file: PathBuf::from("/test/file.rs"),
+            line: 10,
+            column: 5,
+        }
+    }
+    
+    #[test]
+    fn test_qualified_symbol_name() {
+        let qname = QualifiedSymbolName {
+            module_path: PathBuf::from("/src/lib.rs"),
+            symbol: SymbolName("MyType".to_string()),
+        };
+        assert_eq!(qname.module_path, PathBuf::from("/src/lib.rs"));
+        assert_eq!(qname.symbol.0, "MyType");
+    }
+    
+    #[test]
+    fn test_symbol_kind_variants() {
+        assert_ne!(SymbolKind::Struct, SymbolKind::Enum);
+        assert_eq!(SymbolKind::TypeAlias, SymbolKind::TypeAlias);
+        assert_ne!(SymbolKind::Interface, SymbolKind::Union);
+    }
+    
+    #[test]
+    fn test_symbol_origin_variants() {
+        let canonical = SymbolOrigin::Canonical;
+        let external = SymbolOrigin::ExternalDependency;
+        let generated = SymbolOrigin::GeneratedFile;
+        
+        assert_ne!(canonical, external);
+        assert_ne!(external, generated);
+    }
+    
+    #[test]
+    fn test_type_parameter_name() {
+        let param = TypeParameterName("T".to_string());
+        assert_eq!(param.0, "T");
+    }
+    
+    #[test]
+    fn test_generic_instantiation() {
+        let generic = GenericInstantiation {
+            generic: test_qualified_name(),
+            arguments: vec![test_qualified_name()],
+        };
+        assert_eq!(generic.arguments.len(), 1);
+    }
+    
+    #[test]
+    fn test_symbol_origin_canonical() {
+        let origin = SymbolOrigin::Canonical;
+        assert_eq!(origin, SymbolOrigin::Canonical);
+    }
+    
+    #[test]
+    fn test_symbol_origin_reexport() {
+        let origin = SymbolOrigin::ReExport { via_module: PathBuf::from("/mod.rs") };
+        match origin {
+            SymbolOrigin::ReExport { via_module } => assert_eq!(via_module, PathBuf::from("/mod.rs")),
+            _ => panic!("Expected ReExport"),
+        }
+    }
+    
+    #[test]
+    fn test_position_new_valid() {
+        let pos = Position::new(10, 5).unwrap();
+        assert_eq!(pos.line, 10);
+        assert_eq!(pos.column, 5);
+    }
+    
+    #[test]
+    fn test_position_invalid_line() {
+        assert!(matches!(
+            Position::new(0, 5),
+            Err(PositionError::InvalidLine { line: 0 })
+        ));
+    }
+    
+    #[test]
+    fn test_position_invalid_column() {
+        assert!(matches!(
+            Position::new(10, 0),
+            Err(PositionError::InvalidColumn { column: 0 })
+        ));
+    }
+    
+    #[test]
+    fn test_position_at_line() {
+        let pos = Position::at_line(15).unwrap();
+        assert_eq!(pos.line, 15);
+        assert_eq!(pos.column, 1);
+    }
+    
+    #[test]
+    fn test_source_range_new_valid() {
+        let start = Position::new(10, 5).unwrap();
+        let end = Position::new(10, 15).unwrap();
+        let range = SourceRange::new(PathBuf::from("/test.rs"), start, end).unwrap();
+        assert_eq!(range.start, start);
+        assert_eq!(range.end, end);
+    }
+    
+    #[test]
+    fn test_source_range_end_before_start() {
+        let start = Position::new(10, 15).unwrap();
+        let end = Position::new(10, 5).unwrap();
+        assert!(matches!(
+            SourceRange::new(PathBuf::from("/test.rs"), start, end),
+            Err(SourceRangeError::EndBeforeStart { .. })
+        ));
+    }
+    
+    #[test]
+    fn test_source_range_single_line() {
+        let range = SourceRange::single_line(PathBuf::from("/test.rs"), 10, 5, 15).unwrap();
+        assert_eq!(range.start.line, 10);
+        assert_eq!(range.start.column, 5);
+        assert_eq!(range.end.line, 10);
+        assert_eq!(range.end.column, 15);
+        assert!(range.is_single_line());
+    }
+    
+    #[test]
+    fn test_source_range_contains() {
+        let range = SourceRange::single_line(PathBuf::from("/test.rs"), 10, 5, 15).unwrap();
+        let pos_inside = Position::new(10, 10).unwrap();
+        let pos_outside = Position::new(11, 10).unwrap();
+        
+        assert!(range.contains(&pos_inside));
+        assert!(!range.contains(&pos_outside));
+    }
+    
+    #[test]
+    fn test_source_range_overlaps() {
+        let range1 = SourceRange::single_line(PathBuf::from("/test.rs"), 10, 5, 15).unwrap();
+        let range2 = SourceRange::single_line(PathBuf::from("/test.rs"), 10, 10, 20).unwrap();
+        let range3 = SourceRange::single_line(PathBuf::from("/test.rs"), 11, 1, 10).unwrap();
+        
+        assert!(range1.overlaps(&range2));
+        assert!(!range1.overlaps(&range3));
+    }
+    
+    #[test]
+    fn test_source_range_line_count() {
+        let start = Position::new(10, 5).unwrap();
+        let end = Position::new(15, 10).unwrap();
+        let range = SourceRange::new(PathBuf::from("/test.rs"), start, end).unwrap();
+        assert_eq!(range.line_count(), 6); // Lines 10-15 inclusive
+    }
+    
+    #[test]
+    fn test_code_span_new() {
+        let range = SourceRange::single_line(PathBuf::from("/test.rs"), 10, 5, 15).unwrap();
+        let span = CodeSpan::new(range.clone(), "code text".to_string());
+        assert_eq!(span.text, "code text");
+        assert!(!span.has_context());
+    }
+    
+    #[test]
+    fn test_code_span_with_context() {
+        let range = SourceRange::single_line(PathBuf::from("/test.rs"), 10, 5, 15).unwrap();
+        let span = CodeSpan::with_context(
+            range,
+            "code text".to_string(),
+            vec!["before".to_string()],
+            vec!["after".to_string()],
+        );
+        assert!(span.has_context());
+        assert_eq!(span.context_before, Some(vec!["before".to_string()]));
+        assert_eq!(span.context_after, Some(vec!["after".to_string()]));
+    }
+    
+    #[test]
+    fn test_symbol_resolution_unique() {
+        let res = SymbolResolution::Unique {
+            qualified: test_qualified_name(),
+            location: test_source_location(),
+        };
+        assert!(res.is_unique());
+        assert!(!res.is_ambiguous());
+        assert!(!res.is_not_found());
+        assert_eq!(res.candidate_count(), 1);
+        assert!(res.unique_qualified_name().is_some());
+    }
+    
+    #[test]
+    fn test_symbol_resolution_ambiguous() {
+        let res = SymbolResolution::Ambiguous {
+            candidates: vec![test_qualified_name(), test_qualified_name()],
+            locations: vec![test_source_location(), test_source_location()],
+        };
+        assert!(!res.is_unique());
+        assert!(res.is_ambiguous());
+        assert!(!res.is_not_found());
+        assert_eq!(res.candidate_count(), 2);
+        assert!(res.unique_qualified_name().is_none());
+    }
+    
+    #[test]
+    fn test_symbol_resolution_not_found() {
+        let res = SymbolResolution::NotFound {
+            searched_symbol: test_symbol_name(),
+        };
+        assert!(!res.is_unique());
+        assert!(!res.is_ambiguous());
+        assert!(res.is_not_found());
+        assert_eq!(res.candidate_count(), 0);
+        assert!(res.unique_qualified_name().is_none());
+    }
+    
+    #[test]
+    fn test_cross_module_reference_internal() {
+        let cross_ref = CrossModuleReference {
+            source_module: PathBuf::from("/src/a.rs"),
+            target_module: PathBuf::from("/src/b.rs"),
+            symbol: test_symbol_name(),
+            qualified_target: test_qualified_name(),
+            reference_location: test_source_location(),
+            definition_location: test_source_location(),
+            import_path: None,
+            crosses_package_boundary: false,
+        };
+        assert!(cross_ref.is_internal());
+        assert!(!cross_ref.is_external());
+        assert!(!cross_ref.has_explicit_import());
+    }
+    
+    #[test]
+    fn test_cross_module_reference_external() {
+        let cross_ref = CrossModuleReference {
+            source_module: PathBuf::from("/src/a.rs"),
+            target_module: PathBuf::from("/external/lib.rs"),
+            symbol: test_symbol_name(),
+            qualified_target: test_qualified_name(),
+            reference_location: test_source_location(),
+            definition_location: test_source_location(),
+            import_path: Some("external::lib".to_string()),
+            crosses_package_boundary: true,
+        };
+        assert!(!cross_ref.is_internal());
+        assert!(cross_ref.is_external());
+        assert!(cross_ref.has_explicit_import());
+    }
+    
+    #[test]
+    fn test_cross_module_reference_graph_new() {
+        let graph = CrossModuleReferenceGraph::new();
+        assert_eq!(graph.reference_count(), 0);
+        assert_eq!(graph.module_count(), 0);
+    }
+    
+    #[test]
+    fn test_cross_module_reference_graph_add() {
+        let mut graph = CrossModuleReferenceGraph::new();
+        let cross_ref = CrossModuleReference {
+            source_module: PathBuf::from("/src/a.rs"),
+            target_module: PathBuf::from("/src/b.rs"),
+            symbol: test_symbol_name(),
+            qualified_target: test_qualified_name(),
+            reference_location: test_source_location(),
+            definition_location: test_source_location(),
+            import_path: None,
+            crosses_package_boundary: false,
+        };
+        
+        graph.add_reference(cross_ref);
+        assert_eq!(graph.reference_count(), 1);
+        assert_eq!(graph.module_count(), 2);
+    }
+    
+    #[test]
+    fn test_cross_module_reference_graph_references_from() {
+        let mut graph = CrossModuleReferenceGraph::new();
+        let cross_ref = CrossModuleReference {
+            source_module: PathBuf::from("/src/a.rs"),
+            target_module: PathBuf::from("/src/b.rs"),
+            symbol: test_symbol_name(),
+            qualified_target: test_qualified_name(),
+            reference_location: test_source_location(),
+            definition_location: test_source_location(),
+            import_path: None,
+            crosses_package_boundary: false,
+        };
+        
+        graph.add_reference(cross_ref);
+        let from_a = graph.references_from_module(&PathBuf::from("/src/a.rs"));
+        assert_eq!(from_a.len(), 1);
+        
+        let from_b = graph.references_from_module(&PathBuf::from("/src/b.rs"));
+        assert_eq!(from_b.len(), 0);
+    }
+    
+    #[test]
+    fn test_cross_module_reference_graph_external_refs() {
+        let mut graph = CrossModuleReferenceGraph::new();
+        let external = CrossModuleReference {
+            source_module: PathBuf::from("/src/a.rs"),
+            target_module: PathBuf::from("/external/lib.rs"),
+            symbol: test_symbol_name(),
+            qualified_target: test_qualified_name(),
+            reference_location: test_source_location(),
+            definition_location: test_source_location(),
+            import_path: None,
+            crosses_package_boundary: true,
+        };
+        
+        graph.add_reference(external);
+        assert_eq!(graph.external_references().len(), 1);
+        assert_eq!(graph.internal_references().len(), 0);
+    }
+}
