@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod lsp_requests_tests {
-    use crate::domain::graph::{Position, SourceLocation, SourceRange};
+    use crate::domain::graph::{SourceLocation, SourceRange};
     use crate::domain::lsp::{
-        DocumentIdentifier, DocumentSymbol, HoverResponse, MarkupContent, MarkupKind,
+        DocumentIdentifier, DocumentSymbol, HoverResponse, MarkupContent,
         ReferencesResponse, TypeDefinitionResponse,
     };
     use crate::domain::lsp::LspRequestId;

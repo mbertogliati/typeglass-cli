@@ -143,7 +143,11 @@ impl GraphCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::graph::{TypeNode, SymbolKind};
+    use crate::domain::graph::{
+        TypeNode, SymbolKind, GraphCompleteness, SymbolOrigin,
+        SourceLocation, QualifiedSymbolName, SymbolName
+    };
+    use crate::domain::language::Language;
     use std::collections::HashMap;
 
     #[test]

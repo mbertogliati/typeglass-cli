@@ -2,7 +2,7 @@
 mod workspace_modules_tests {
     use std::path::PathBuf;
 
-    use crate::domain::graph::{Position, SourceRange};
+    use crate::domain::graph::SourceRange;
     use crate::domain::workspace::{
         DependencyKind, ExportKind, ExportStatement, ImportKind, ImportStatement, ModuleDependency,
         ModuleDependencyGraph, ModuleNode, ModulePath,

@@ -4,7 +4,7 @@ mod workspace_watch_tests {
     use std::time::SystemTime;
 
     use crate::domain::workspace::{
-        ContentHash, FileChangeBatch, FileChangeEvent, FileChangeKind, FileWatchPolicy,
+        FileChangeBatch, FileChangeEvent, FileChangeKind, FileWatchPolicy,
     };
 
     #[test]

@@ -154,6 +154,10 @@ impl PartialGraph {
 #[cfg(test)]
 mod traversal_impl_tests {
     use super::*;
+    use crate::domain::graph::{
+        EdgeKind, GraphCompleteness, SymbolKind, SymbolOrigin,
+        TypeNode, TypeEdge, QualifiedSymbolName, SymbolName
+    };
     use crate::domain::language::Language;
     use std::path::PathBuf;
 

@@ -235,7 +235,7 @@ impl LazyGraphBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     // Note: Real tests would require LSP server running
     // Integration tests will cover the full flow

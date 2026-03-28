@@ -4,7 +4,7 @@ mod traversal_types_tests {
 
     use crate::domain::graph::{
         CrossModuleReference, CrossModuleReferenceGraph, QualifiedSymbolName, ReferenceKind,
-        ReferenceQuery, ReferenceResult, ResolutionStrategy, SourceLocation, SymbolName,
+        ReferenceQuery, ReferenceResult, SourceLocation, SymbolName,
         SymbolReference, SymbolResolution, TraversalDirection, TraversalFilter, TraversalProgress,
     };
 
