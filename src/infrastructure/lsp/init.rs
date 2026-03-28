@@ -370,6 +370,50 @@ impl LspClient {
 
         Ok(symbols)
     }
+
+    /// Find all references to a symbol at the given position
+    /// Returns locations where this symbol is used/referenced
+    pub async fn find_references(
+        &mut self,
+        file_uri: &str,
+        line: u32,
+        character: u32,
+        include_declaration: bool,
+    ) -> Result<Vec<Location>, LspClientError> {
+        if !self.initialized {
+            return Err(LspClientError::NotInitialized);
+        }
+
+        let params = serde_json::json!({
+            "textDocument": {
+                "uri": file_uri
+            },
+            "position": {
+                "line": line,
+                "character": character
+            },
+            "context": {
+                "includeDeclaration": include_declaration
+            }
+        });
+
+        eprintln!("DEBUG: Sending textDocument/references request for {}:{}:{}", file_uri, line, character);
+
+        let response = self.send_request("textDocument/references", params).await?;
+
+        let locations: Vec<Location> = match response {
+            Value::Array(arr) => serde_json::from_value(Value::Array(arr))?,
+            Value::Null => vec![],
+            _ => {
+                return Err(LspClientError::InvalidResponse(
+                    format!("Unexpected references response format: {:?}", response),
+                ))
+            }
+        };
+
+        eprintln!("DEBUG: Got {} reference locations", locations.len());
+        Ok(locations)
+    }
 }
 
 /// LSP Location type
