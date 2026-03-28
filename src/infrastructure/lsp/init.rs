@@ -29,6 +29,18 @@ pub enum LspClientError {
     InvalidResponse(String),
 }
 
+impl LspClientError {
+    /// LSP-004 fix: Create error with actionable context
+    fn with_context(message: impl Into<String>, context: impl Into<String>, suggestion: impl Into<String>) -> Self {
+        LspClientError::InvalidResponse(format!(
+            "{}\n\n  Context: {}\n  Suggestion: {}",
+            message.into(),
+            context.into(),
+            suggestion.into()
+        ))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct JsonRpcRequest {
     jsonrpc: String,
@@ -137,8 +149,10 @@ impl LspClient {
 
         // LSP-003 fix: Proper file URI encoding
         let root_uri = Url::from_file_path(&workspace_root)
-            .map_err(|_| LspClientError::InvalidResponse(
-                format!("Invalid workspace path: {}", workspace_root.display())
+            .map_err(|_| LspClientError::with_context(
+                format!("Invalid workspace path: {}", workspace_root.display()),
+                "File path could not be converted to file:// URI",
+                "Ensure the workspace path exists and is absolute"
             ))?
             .to_string();
         
