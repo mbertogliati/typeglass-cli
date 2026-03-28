@@ -206,6 +206,8 @@ impl LspClient {
     /// Send a request and wait for response
     /// LSP-009 fix: Skip notifications and only return responses
     async fn send_request(&mut self, method: &str, params: Value) -> Result<Value, LspClientError> {
+        use tokio::time::{timeout, Duration};
+        
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         let request = JsonRpcRequest {
@@ -218,38 +220,49 @@ impl LspClient {
         let request_json = serde_json::to_string(&request)?;
         self.process.send_message(&request_json).await?;
 
-        // Read messages until we get the response with matching id
-        // Skip any notifications that arrive in between
-        loop {
-            let message_json = self.process.read_message().await?;
-            
-            match LspMessage::parse(&message_json)? {
-                LspMessage::Response(response) => {
-                    // Check if it's our response
-                    if response.id == id {
-                        // Check for errors
-                        if let Some(error) = response.error {
-                            return Err(LspClientError::InvalidResponse(format!(
-                                "LSP error: {}",
-                                error
-                            )));
-                        }
+        // LSP-007 fix: Wrap response reading with timeout
+        let response_future = async {
+            // Read messages until we get the response with matching id
+            // Skip any notifications that arrive in between
+            loop {
+                let message_json = self.process.read_message().await?;
+                
+                match LspMessage::parse(&message_json)? {
+                    LspMessage::Response(response) => {
+                        // Check if it's our response
+                        if response.id == id {
+                            // Check for errors
+                            if let Some(error) = response.error {
+                                return Err(LspClientError::InvalidResponse(format!(
+                                    "LSP error: {}",
+                                    error
+                                )));
+                            }
 
-                        return response
-                            .result
-                            .ok_or_else(|| LspClientError::InvalidResponse("No result in response".to_string()));
-                    } else {
-                        // Response for different request, skip
-                        log::debug!("DEBUG: Received response for different request (expected {}, got {})", id, response.id);
+                            return response
+                                .result
+                                .ok_or_else(|| LspClientError::InvalidResponse("No result in response".to_string()));
+                        } else {
+                            // Response for different request, skip
+                            log::debug!("DEBUG: Received response for different request (expected {}, got {})", id, response.id);
+                            continue;
+                        }
+                    }
+                    LspMessage::Notification(notification) => {
+                        // Log and skip notifications
+                        log::debug!("DEBUG: Received notification: {}", notification.method);
                         continue;
                     }
                 }
-                LspMessage::Notification(notification) => {
-                    // Log and skip notifications
-                    log::debug!("DEBUG: Received notification: {}", notification.method);
-                    continue;
-                }
             }
+        };
+
+        // Timeout after 30 seconds
+        match timeout(Duration::from_secs(30), response_future).await {
+            Ok(result) => result,
+            Err(_) => Err(LspClientError::InvalidResponse(format!(
+                "LSP request timed out after 30 seconds (method: {})", method
+            ))),
         }
     }
 
