@@ -53,6 +53,41 @@ struct JsonRpcResponse {
     error: Option<Value>,
 }
 
+/// LSP-009 fix: Represent either a response or notification
+#[derive(Debug)]
+enum LspMessage {
+    Response(JsonRpcResponse),
+    Notification(JsonRpcNotification),
+}
+
+impl LspMessage {
+    /// Parse generic JSON into either Response or Notification
+    fn parse(json: &str) -> Result<Self, LspClientError> {
+        // First try to parse as a generic Value to check for "id" field
+        let value: Value = serde_json::from_str(json)?;
+        
+        if let Some(obj) = value.as_object() {
+            if obj.contains_key("id") {
+                // It's a response
+                let response: JsonRpcResponse = serde_json::from_value(value)?;
+                Ok(LspMessage::Response(response))
+            } else if obj.contains_key("method") {
+                // It's a notification
+                let notification: JsonRpcNotification = serde_json::from_value(value)?;
+                Ok(LspMessage::Notification(notification))
+            } else {
+                Err(LspClientError::InvalidResponse(
+                    "Message has neither 'id' nor 'method' field".to_string()
+                ))
+            }
+        } else {
+            Err(LspClientError::InvalidResponse(
+                "Message is not a JSON object".to_string()
+            ))
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct InitializeParams {
     #[serde(rename = "rootUri")]
@@ -169,6 +204,7 @@ impl LspClient {
     }
 
     /// Send a request and wait for response
+    /// LSP-009 fix: Skip notifications and only return responses
     async fn send_request(&mut self, method: &str, params: Value) -> Result<Value, LspClientError> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
@@ -182,21 +218,39 @@ impl LspClient {
         let request_json = serde_json::to_string(&request)?;
         self.process.send_message(&request_json).await?;
 
-        // Read response
-        let response_json = self.process.read_message().await?;
-        let response: JsonRpcResponse = serde_json::from_str(&response_json)?;
+        // Read messages until we get the response with matching id
+        // Skip any notifications that arrive in between
+        loop {
+            let message_json = self.process.read_message().await?;
+            
+            match LspMessage::parse(&message_json)? {
+                LspMessage::Response(response) => {
+                    // Check if it's our response
+                    if response.id == id {
+                        // Check for errors
+                        if let Some(error) = response.error {
+                            return Err(LspClientError::InvalidResponse(format!(
+                                "LSP error: {}",
+                                error
+                            )));
+                        }
 
-        // Check for errors
-        if let Some(error) = response.error {
-            return Err(LspClientError::InvalidResponse(format!(
-                "LSP error: {}",
-                error
-            )));
+                        return response
+                            .result
+                            .ok_or_else(|| LspClientError::InvalidResponse("No result in response".to_string()));
+                    } else {
+                        // Response for different request, skip
+                        eprintln!("DEBUG: Received response for different request (expected {}, got {})", id, response.id);
+                        continue;
+                    }
+                }
+                LspMessage::Notification(notification) => {
+                    // Log and skip notifications
+                    eprintln!("DEBUG: Received notification: {}", notification.method);
+                    continue;
+                }
+            }
         }
-
-        response
-            .result
-            .ok_or_else(|| LspClientError::InvalidResponse("No result in response".to_string()))
     }
 
     /// Send a notification (no response expected)
