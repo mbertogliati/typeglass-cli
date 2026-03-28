@@ -220,6 +220,11 @@ impl LazyGraphBuilder {
         }
     }
 
+    /// Query all workspace symbols (optionally filtered by query string)
+    pub async fn workspace_symbols(&mut self, query: &str) -> Result<Vec<crate::infrastructure::lsp::init::SymbolInformation>, GraphBuilderError> {
+        Ok(self.lsp_client.workspace_symbols(query).await?)
+    }
+
     /// Shutdown LSP client
     pub async fn shutdown(mut self) -> Result<(), GraphBuilderError> {
         self.lsp_client.shutdown().await?;
