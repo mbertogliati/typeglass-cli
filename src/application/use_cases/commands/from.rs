@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::application::adapters::ApplicationAdapters;
 use crate::application::service::{ActionExecutor, ApplicationService};
-use crate::application::types::{ApplicationOutcome, CommandAction, GenericSuccess};
+use crate::application::types::{ApplicationOutcome, CommandAction, GenericSuccess, GenericFailure};
 use crate::domain::graph::TraversalDirection;
 use crate::domain::language::Language;
 use crate::infrastructure::LazyGraphBuilder;
@@ -49,7 +49,27 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
         // Get workspace root
         let workspace_root = match &context.user_workspace {
             crate::ux_model::intent::UserWorkspace::Explicit(path) => path.clone(),
-            crate::ux_model::intent::UserWorkspace::Pwd => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            crate::ux_model::intent::UserWorkspace::Pwd => {
+                match std::env::current_dir() {
+                    Ok(dir) => dir,
+                    Err(e) => {
+                        return UserResult::Failure(GenericFailure {
+                            promises: vec![
+                                UserPromise(UserPromiseType::NeverSilentWrong),
+                                UserPromise(UserPromiseType::ErrorsAreActionable),
+                            ],
+                            summary: UserSummary("Failed to determine workspace root".to_string()),
+                            limitations: vec![UserLimitation(format!("Could not read current directory: {}", e))],
+                            next_step: UserNextStep(
+                                "Run from a valid directory or specify --workspace /path/to/workspace".to_string(),
+                            ),
+                            context: UserResultContext {
+                                command_context: context,
+                            },
+                        });
+                    }
+                }
+            },
         };
 
         // Detect language (simplified - just check for Rust for now)

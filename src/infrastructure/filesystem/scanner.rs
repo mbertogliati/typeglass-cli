@@ -24,6 +24,9 @@ pub enum SymbolFinderError {
     
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+    
+    #[error("Invalid regex pattern for symbol '{symbol}': {error}")]
+    InvalidPattern { symbol: String, error: String },
 }
 
 impl SymbolFinder {
@@ -51,7 +54,10 @@ impl SymbolFinder {
         
         // Pattern: word boundary + symbol + word boundary
         let pattern = format!(r"\b{}\b", regex::escape(symbol_name));
-        let re = Regex::new(&pattern).unwrap();
+        let re = Regex::new(&pattern).map_err(|e| SymbolFinderError::InvalidPattern {
+            symbol: symbol_name.to_string(),
+            error: e.to_string(),
+        })?;
 
         self.scan_directory(&self.workspace_root, &re, symbol_name, &mut locations)?;
 
