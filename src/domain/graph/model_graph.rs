@@ -194,3 +194,82 @@ impl Default for PartialGraph {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use crate::domain::language::Language;
+
+    #[test]
+    fn test_edge_kind_variants() {
+        assert_ne!(EdgeKind::Contains, EdgeKind::Extends);
+        assert_eq!(EdgeKind::Variant, EdgeKind::Variant);
+    }
+
+    #[test]
+    fn test_type_edge() {
+        let edge = TypeEdge {
+            from: SymbolName("A".to_string()),
+            to: SymbolName("B".to_string()),
+            kind: EdgeKind::Extends,
+        };
+        assert_eq!(edge.from.0, "A");
+    }
+
+    #[test]
+    fn test_partial_graph_new() {
+        let g = PartialGraph::new();
+        assert_eq!(g.node_count(), 0);
+        assert_eq!(g.completeness_percentage, 0);
+    }
+
+    #[test]
+    fn test_partial_graph_with_completeness() {
+        let g = PartialGraph::new().with_completeness(85);
+        assert_eq!(g.completeness_percentage, 85);
+        
+        let clamped = PartialGraph::new().with_completeness(150);
+        assert_eq!(clamped.completeness_percentage, 100);
+    }
+
+    #[test]
+    fn test_partial_graph_is_mostly_complete() {
+        assert!(PartialGraph::new().with_completeness(95).is_mostly_complete());
+        assert!(!PartialGraph::new().with_completeness(80).is_mostly_complete());
+    }
+
+    #[test]
+    fn test_graph_completeness_variants() {
+        let complete = GraphCompleteness::Complete;
+        assert!(matches!(complete, GraphCompleteness::Complete));
+        
+        let partial = GraphCompleteness::Partial {
+            unresolved_references: 5,
+            signals: vec![],
+        };
+        assert!(matches!(partial, GraphCompleteness::Partial { .. }));
+    }
+
+    #[test]
+    fn test_partial_result_reason_variants() {
+        let r1 = PartialResultReason::DepthLimitReached;
+        let r2 = PartialResultReason::LspIndexNotReady;
+        assert_ne!(r1, r2);
+    }
+
+    #[test]
+    fn test_unresolved_reference() {
+        let u = UnresolvedReference {
+            symbol: SymbolName("X".to_string()),
+            referenced_from: SourceLocation {
+                file: PathBuf::from("test.rs"),
+                line: 10,
+                column: 5,
+            },
+            reason: UnresolveReason::SymbolNotFound,
+        };
+        assert_eq!(u.symbol.0, "X");
+    }
+}
