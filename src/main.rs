@@ -1,8 +1,11 @@
 use typeglass_cli::application;
+use typeglass_cli::domain::language::Language;
 use typeglass_cli::infrastructure::cli;
+use typeglass_cli::infrastructure::adapters::WiredAdapters;
 use typeglass_cli::ux_model;
 use typeglass_cli::infrastructure::cli::UserRequest;
 use clap::Parser;
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() {
@@ -30,7 +33,14 @@ async fn main() {
         }
     };
 
-    let service = application::ApplicationService::new(application::UnwiredAdapters);
+    // Get workspace root and detect language
+    let workspace_root = std::env::current_dir().expect("Failed to get current directory");
+    let language = detect_language(&workspace_root);
+
+    // Create service with REAL adapters (not UnwiredAdapters)
+    let service = application::ApplicationService::new(
+        WiredAdapters::new(workspace_root, language)
+    );
     
     match request {
         UserRequest::From(req, json, _) => {
@@ -96,5 +106,20 @@ where
                 std::process::exit(1);
             }
         }
+    }
+}
+
+/// Detect project language from workspace markers
+fn detect_language(workspace_root: &PathBuf) -> Language {
+    if workspace_root.join("Cargo.toml").exists() {
+        Language::Rust
+    } else if workspace_root.join("package.json").exists() || workspace_root.join("tsconfig.json").exists() {
+        Language::TypeScript
+    } else if workspace_root.join("go.mod").exists() {
+        Language::Go
+    } else {
+        // Default to Rust if detection fails
+        eprintln!("Warning: Could not detect language, defaulting to Rust");
+        Language::Rust
     }
 }
