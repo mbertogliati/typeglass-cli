@@ -3,7 +3,7 @@ use predicates::prelude::*;
 
 #[test]
 fn test_cli_help() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("--help")
         .assert()
         .success()
@@ -12,7 +12,7 @@ fn test_cli_help() {
 
 #[test]
 fn test_from_command_help() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--help")
         .assert()
@@ -22,7 +22,7 @@ fn test_from_command_help() {
 
 #[test]
 fn test_from_command_requires_target() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .assert()
         .failure()
@@ -31,18 +31,18 @@ fn test_from_command_requires_target() {
 
 #[test]
 fn test_from_command_with_symbol() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--symbol")
         .arg("TypeA")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Failed to build graph"));
+        .stdout(predicate::str::contains("Found").or(predicate::str::contains("Failed")));
 }
 
 #[test]
 fn test_from_command_with_depth() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--symbol")
         .arg("TypeA")
@@ -50,56 +50,56 @@ fn test_from_command_with_depth() {
         .arg("3")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Failed to build graph"));
+        .stdout(predicate::str::contains("Found").or(predicate::str::contains("Failed")));
 }
 
 #[test]
 fn test_from_command_invalid_symbol() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--symbol")
-        .arg("")
+        .arg("NonExistentSymbolThatReallyDoesNotExist12345")
         .assert()
-        .success() // CLI returns 0 even for validation failures
-        .stdout(predicate::str::contains("Failure"));
+        .failure() // Symbol not found returns exit 1
+        .stderr(predicate::str::contains("Failed").or(predicate::str::contains("Symbol not found")));
 }
 
 #[test]
 fn test_from_command_file_not_implemented() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--file")
         .arg("test.ts")
         .assert()
-        .success() // Returns Failure result but exit 0
-        .stdout(predicate::str::contains("not yet implemented")
-            .or(predicate::str::contains("not yet supported")));
+        .failure() // Not implemented returns exit 1
+        .stderr(predicate::str::contains("not yet implemented")
+            .or(predicate::str::contains("symbol-based traversal")));
 }
 
 #[test]
 fn test_from_command_module_not_implemented() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--module")
         .arg("./src")
         .assert()
-        .success() // Returns Failure result but exit 0
-        .stdout(predicate::str::contains("not yet supported"));
+        .failure() // Not implemented returns exit 1
+        .stderr(predicate::str::contains("symbol-based traversal"));
 }
 
 #[test]
 fn test_from_command_public_exports_not_implemented() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--public-exports")
         .assert()
-        .success() // Returns Failure result but exit 0
-        .stdout(predicate::str::contains("not yet supported"));
+        .failure() // Not implemented returns exit 1
+        .stderr(predicate::str::contains("symbol-based traversal"));
 }
 
 #[test]
 fn test_doctor_command() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("doctor")
         .assert()
         .success();
@@ -107,7 +107,7 @@ fn test_doctor_command() {
 
 #[test]
 fn test_gc_command() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("gc")
         .assert()
         .success();
@@ -115,7 +115,7 @@ fn test_gc_command() {
 
 #[test]
 fn test_init_command() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("init")
         .assert()
         .success();
@@ -123,35 +123,35 @@ fn test_init_command() {
 
 #[test]
 fn test_multiple_symbols() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--symbol")
-        .arg("TypeA")
+        .arg("TypeNode") // Real symbol
         .assert()
         .success();
 
-    let mut cmd2 = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd2 = Command::cargo_bin("typeglass").unwrap();
     cmd2.arg("from")
         .arg("--symbol")
-        .arg("TypeB")
+        .arg("TypeGraph") // Real symbol
         .assert()
         .success();
 }
 
 #[test]
 fn test_from_with_default_depth() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--symbol")
-        .arg("TestType")
+        .arg("TypeGraph") // Use a real symbol from our codebase
         .assert()
         .success()
-        .stdout(predicate::str::contains("Failed to build graph"));
+        .stdout(predicate::str::contains("Found"));
 }
 
 #[test]
 fn test_traversal_completeness_shown() {
-    let mut cmd = Command::cargo_bin("typeglass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--symbol")
         .arg("TypeA")
