@@ -9,6 +9,12 @@ async fn main() {
     env_logger::init();
 
     let args = cli::parse_cli();
+    
+    // Set debug mode BEFORE resolve_intent
+    if args.debug {
+        std::env::set_var("TYPEGLASS_DEBUG", "1");
+    }
+    
     let request = match cli::resolve_intent(args) {
         Ok(request) => request,
         Err(cli::IntentResolutionError::ShowHelp) => {
@@ -25,27 +31,27 @@ async fn main() {
     let service = application::ApplicationService::new(application::UnwiredAdapters);
     
     match request {
-        UserRequest::From(req, json) => {
+        UserRequest::From(req, json, _) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
             print_response(response, json);
         }
-        UserRequest::Gc(req, json) => {
+        UserRequest::Gc(req, json, _) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
             print_response(response, json);
         }
-        UserRequest::Doctor(req, json) => {
+        UserRequest::Doctor(req, json, _) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
             print_response(response, json);
         }
-        UserRequest::Init(req, json) => {
+        UserRequest::Init(req, json, _) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
             print_response(response, json);
         }
-        UserRequest::Interactive(req, json) => {
+        UserRequest::Interactive(req, json, _) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
             print_response(response, json);

@@ -15,10 +15,15 @@ pub enum QueryTarget {
 #[command(name = "typeglass")]
 #[command(about = "Navigate type relationships lazily through LSP")]
 #[command(version)]
+#[command(after_help = "TIP: Use --help after any command for detailed options (e.g., 'typeglass from --help')")]
 pub struct CliArgs {
     /// Output results as JSON (default: human-readable)
     #[arg(long, global = true, help = "Output as JSON instead of human-readable format")]
     pub json: bool,
+    
+    /// Enable debug logging (shows LSP communication details)
+    #[arg(long, global = true, help = "Enable verbose debug output")]
+    pub debug: bool,
     
     #[command(subcommand)]
     pub command: Option<CliCommand>,

@@ -1,3 +1,12 @@
+/// Helper macro for debug logging (only prints if TYPEGLASS_DEBUG=1)
+macro_rules! debug_log {
+    ($($arg:tt)*) => {
+        if std::env::var("TYPEGLASS_DEBUG").is_ok() {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 
@@ -57,9 +66,9 @@ impl LazyGraphBuilder {
         // This properly finds symbol definitions, not just any occurrence
         let symbols = self.lsp_client.workspace_symbols(symbol_name).await?;
         
-        eprintln!("DEBUG: Found {} symbols for '{}'", symbols.len(), symbol_name);
+        debug_log!("DEBUG: Found {} symbols for '{}'", symbols.len(), symbol_name);
         for (i, sym) in symbols.iter().enumerate() {
-            eprintln!("  [{}] {} (kind: {}) at {}", i, sym.name, sym.kind, sym.location.uri);
+            debug_log!("  [{}] {} (kind: {}) at {}", i, sym.name, sym.kind, sym.location.uri);
         }
         
         if symbols.is_empty() {
@@ -77,11 +86,11 @@ impl LazyGraphBuilder {
                 symbol: symbol_name.to_string(),
             }))?;
 
-        eprintln!("DEBUG: Selected symbol: {} at {}", entry_symbol.name, entry_symbol.location.uri);
+        debug_log!("DEBUG: Selected symbol: {} at {}", entry_symbol.name, entry_symbol.location.uri);
 
         let entry_location = parse_lsp_location(&entry_symbol.location)?;
 
-        eprintln!("DEBUG: Parsed location: {:?}", entry_location.file_path);
+        debug_log!("DEBUG: Parsed location: {:?}", entry_location.file_path);
 
         // Build graph incrementally
         let mut graph = TypeGraph::empty();
@@ -100,7 +109,7 @@ impl LazyGraphBuilder {
 
             // Query definition - use original URI from LSP!
             let file_uri = &entry_symbol.location.uri;
-            eprintln!("DEBUG: Querying definition at {}", file_uri);
+            debug_log!("DEBUG: Querying definition at {}", file_uri);
             
             let definitions = self
                 .lsp_client
@@ -113,7 +122,7 @@ impl LazyGraphBuilder {
                 graph.add_node(node);
                 
                 // Now find references to build edges
-                eprintln!("DEBUG: Finding references for {} at {}:{}:{}", 
+                debug_log!("DEBUG: Finding references for {} at {}:{}:{}", 
                     symbol.0, file_uri, location.line, location.character);
                 
                 match self.lsp_client.find_references(
@@ -123,13 +132,13 @@ impl LazyGraphBuilder {
                     false // don't include declaration
                 ).await {
                     Ok(references) => {
-                        eprintln!("DEBUG: Got {} reference locations", references.len());
+                        debug_log!("DEBUG: Got {} reference locations", references.len());
                         
                         // For each reference, determine the containing symbol to build edges
                         for (i, reference) in references.iter().enumerate().take(10) { // Limit to 10 refs for MVP
                             let ref_loc = parse_lsp_location(reference)?;
                             
-                            eprintln!("DEBUG: [Ref {}/{}] Processing reference at {}:{}:{}", 
+                            debug_log!("DEBUG: [Ref {}/{}] Processing reference at {}:{}:{}", 
                                 i + 1, references.len().min(10),
                                 reference.uri, 
                                 reference.range.start.line,
@@ -150,24 +159,24 @@ impl LazyGraphBuilder {
                                     };
                                     
                                     graph.add_edge(edge);
-                                    eprintln!("DEBUG: Created edge: {} -> {}", using_sym.0, symbol.0);
+                                    debug_log!("DEBUG: Created edge: {} -> {}", using_sym.0, symbol.0);
                                     
                                     // Add to queue for further traversal if within depth
                                     if depth + 1 < max_depth && !visited.contains(&using_sym) {
                                         visited.insert(using_sym.clone());
                                         queue.push_back((using_sym, ref_loc, depth + 1));
-                                        eprintln!("DEBUG: Queued {} for traversal at depth {}", using_symbol_name, depth + 1);
+                                        debug_log!("DEBUG: Queued {} for traversal at depth {}", using_symbol_name, depth + 1);
                                     }
                                 }
                             }
                         }
                         
                         if references.len() > 10 {
-                            eprintln!("DEBUG: Skipped {} references (limited to 10 for MVP)", references.len() - 10);
+                            debug_log!("DEBUG: Skipped {} references (limited to 10 for MVP)", references.len() - 10);
                         }
                     }
                     Err(e) => {
-                        eprintln!("DEBUG: Failed to find references: {}", e);
+                        debug_log!("DEBUG: Failed to find references: {}", e);
                         // Continue without edges - partial result
                     }
                 }
@@ -288,3 +297,4 @@ fn extract_symbol_from_path(path: &PathBuf) -> Option<String> {
                 .collect::<String>()
         })
 }
+
