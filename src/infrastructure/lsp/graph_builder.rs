@@ -6,7 +6,7 @@ use crate::domain::graph::{
     SymbolOrigin, TraversalDirection, TypeEdge, TypeGraph, TypeNode,
 };
 use crate::domain::language::{Language, LspServerConfig};
-use crate::infrastructure::{LspClient, LspClientError, Location, SymbolFinderError};
+use crate::infrastructure::{LspClient, LspClientError, Location, SymbolFinderError, HoverContents};
 
 /// Lazy graph builder - builds TypeGraph incrementally via LSP queries
 pub struct LazyGraphBuilder {
@@ -125,16 +125,46 @@ impl LazyGraphBuilder {
                     Ok(references) => {
                         eprintln!("DEBUG: Got {} reference locations", references.len());
                         
-                        // For each reference, we need to determine which symbol uses it
-                        // This requires querying hover or documentSymbol at the reference location
-                        // For MVP: Count references but don't traverse yet
-                        // Full implementation would:
-                        // 1. For each reference location
-                        // 2. Query hover to get the containing symbol name
-                        // 3. Create TypeEdge from that symbol to current symbol
-                        // 4. Add to queue if depth allows
+                        // For each reference, determine the containing symbol to build edges
+                        for (i, reference) in references.iter().enumerate().take(10) { // Limit to 10 refs for MVP
+                            let ref_loc = parse_lsp_location(reference)?;
+                            
+                            eprintln!("DEBUG: [Ref {}/{}] Processing reference at {}:{}:{}", 
+                                i + 1, references.len().min(10),
+                                reference.uri, 
+                                reference.range.start.line,
+                                reference.range.start.character);
+                            
+                            // Strategy: Use file path to infer containing symbol
+                            // Full implementation would query documentSymbol or parse hover
+                            if let Some(using_symbol_name) = extract_symbol_from_path(&ref_loc.file_path) {
+                                let using_sym = SymbolName(using_symbol_name.clone());
+                                
+                                // Don't create self-edges
+                                if using_sym != symbol {
+                                    // Create edge: using_symbol -> current_symbol (dependency)
+                                    let edge = TypeEdge {
+                                        from: using_sym.clone(),
+                                        to: symbol.clone(),
+                                        kind: EdgeKind::Contains, // Simplified
+                                    };
+                                    
+                                    graph.add_edge(edge);
+                                    eprintln!("DEBUG: Created edge: {} -> {}", using_sym.0, symbol.0);
+                                    
+                                    // Add to queue for further traversal if within depth
+                                    if depth + 1 < max_depth && !visited.contains(&using_sym) {
+                                        visited.insert(using_sym.clone());
+                                        queue.push_back((using_sym, ref_loc, depth + 1));
+                                        eprintln!("DEBUG: Queued {} for traversal at depth {}", using_symbol_name, depth + 1);
+                                    }
+                                }
+                            }
+                        }
                         
-                        // TODO: Implement in next phase (graph-recursive-traversal)
+                        if references.len() > 10 {
+                            eprintln!("DEBUG: Skipped {} references (limited to 10 for MVP)", references.len() - 10);
+                        }
                     }
                     Err(e) => {
                         eprintln!("DEBUG: Failed to find references: {}", e);
@@ -237,4 +267,24 @@ fn parse_lsp_location(loc: &crate::infrastructure::lsp::init::Location) -> Resul
         line: loc.range.start.line,
         character: loc.range.start.character,
     })
+}
+
+/// Extract likely symbol name from file path (heuristic for MVP)
+/// e.g., "src/domain/graph/model_graph.rs" -> Some("TypeGraph")
+fn extract_symbol_from_path(path: &PathBuf) -> Option<String> {
+    path.file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| {
+            // Convert snake_case to PascalCase heuristic
+            // model_graph -> ModelGraph
+            s.split('_')
+                .map(|word| {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(first) => first.to_uppercase().chain(chars).collect(),
+                    }
+                })
+                .collect::<String>()
+        })
 }
