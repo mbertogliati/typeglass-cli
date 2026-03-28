@@ -47,17 +47,19 @@ pub enum IntentResolutionError {
 }
 
 pub enum UserRequest {
-    From(crate::ux_model::intent::UserRequest<UserCommandFrom>),
-    Gc(crate::ux_model::intent::UserRequest<UserCommandGc>),
-    Doctor(crate::ux_model::intent::UserRequest<UserCommandDoctor>),
-    Init(crate::ux_model::intent::UserRequest<UserCommandInit>),
-    Interactive(crate::ux_model::intent::UserRequest<UserCommandInteractive>),
+    From(crate::ux_model::intent::UserRequest<UserCommandFrom>, bool), // bool = json_output
+    Gc(crate::ux_model::intent::UserRequest<UserCommandGc>, bool),
+    Doctor(crate::ux_model::intent::UserRequest<UserCommandDoctor>, bool),
+    Init(crate::ux_model::intent::UserRequest<UserCommandInit>, bool),
+    Interactive(crate::ux_model::intent::UserRequest<UserCommandInteractive>, bool),
 }
 
 pub fn resolve_intent(args: CliArgs) -> Result<UserRequest, IntentResolutionError> {
     let context = UserCommandContext {
         user_workspace: UserWorkspace::Pwd,
     };
+    
+    let json_output = args.json;
 
     let command = match args.command {
         Some(cmd) => cmd,
@@ -77,19 +79,19 @@ pub fn resolve_intent(args: CliArgs) -> Result<UserRequest, IntentResolutionErro
                 QueryTarget::Module(module) => UserCommandFrom::module(module, resolved.depth),
                 QueryTarget::PublicExports => UserCommandFrom::public_exports(resolved.depth),
             };
-            Ok(UserRequest::From(crate::ux_model::intent::UserRequest::terminal(cmd, context)))
+            Ok(UserRequest::From(crate::ux_model::intent::UserRequest::terminal(cmd, context), json_output))
         }
         CliCommand::Gc => {
-            Ok(UserRequest::Gc(crate::ux_model::intent::UserRequest::terminal(UserCommandGc, context)))
+            Ok(UserRequest::Gc(crate::ux_model::intent::UserRequest::terminal(UserCommandGc, context), json_output))
         }
         CliCommand::Doctor => {
-            Ok(UserRequest::Doctor(crate::ux_model::intent::UserRequest::terminal(UserCommandDoctor, context)))
+            Ok(UserRequest::Doctor(crate::ux_model::intent::UserRequest::terminal(UserCommandDoctor, context), json_output))
         }
         CliCommand::Init => {
-            Ok(UserRequest::Init(crate::ux_model::intent::UserRequest::terminal(UserCommandInit, context)))
+            Ok(UserRequest::Init(crate::ux_model::intent::UserRequest::terminal(UserCommandInit, context), json_output))
         }
         CliCommand::Interactive => {
-            Ok(UserRequest::Interactive(crate::ux_model::intent::UserRequest::interactive(UserCommandInteractive, context)))
+            Ok(UserRequest::Interactive(crate::ux_model::intent::UserRequest::interactive(UserCommandInteractive, context), json_output))
         }
     }
 }

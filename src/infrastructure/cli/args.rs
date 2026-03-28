@@ -16,6 +16,10 @@ pub enum QueryTarget {
 #[command(about = "Navigate type relationships lazily through LSP")]
 #[command(version)]
 pub struct CliArgs {
+    /// Output results as JSON (default: human-readable)
+    #[arg(long, global = true, help = "Output as JSON instead of human-readable format")]
+    pub json: bool,
+    
     #[command(subcommand)]
     pub command: Option<CliCommand>,
 }
@@ -51,8 +55,24 @@ pub enum CliCommand {
         .multiple(false)
 ))]
 pub struct FromArgs {
-    /// Start from a specific symbol (type, function, etc.)
-    #[arg(long, help = "Symbol name to start navigation from (e.g., TypeNode)")]
+    /// Name of a type, struct, class, interface, enum, or function
+    #[arg(
+        long, 
+        value_name = "NAME",
+        help = "Symbol name (e.g., TypeNode, HashMap, UserService)",
+        long_help = "Name of a type, struct, class, interface, enum, or function to start navigation from.
+
+Examples by language:
+  Rust:       TypeNode, Result, Option, HashMap, Vec
+  TypeScript: UserService, ApiClient, React.Component
+  Go:         http.Server, context.Context, sql.DB
+
+How to find symbols:
+  • Check your editor's 'Go to Symbol' (Cmd+T / Ctrl+T)
+  • Look at type definitions in your code
+  • Use grep: grep -r '^struct \\|^class \\|^type ' src/
+  • Just try a type name - the CLI will tell you if not found"
+    )]
     pub symbol: Option<String>,
     
     /// Start from all symbols in a file

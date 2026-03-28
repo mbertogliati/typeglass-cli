@@ -25,49 +25,68 @@ async fn main() {
     let service = application::ApplicationService::new(application::UnwiredAdapters);
     
     match request {
-        UserRequest::From(req) => {
+        UserRequest::From(req, json) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
-            print_response(response);
+            print_response(response, json);
         }
-        UserRequest::Gc(req) => {
+        UserRequest::Gc(req, json) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
-            print_response(response);
+            print_response(response, json);
         }
-        UserRequest::Doctor(req) => {
+        UserRequest::Doctor(req, json) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
-            print_response(response);
+            print_response(response, json);
         }
-        UserRequest::Init(req) => {
+        UserRequest::Init(req, json) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
-            print_response(response);
+            print_response(response, json);
         }
-        UserRequest::Interactive(req) => {
+        UserRequest::Interactive(req, json) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
-            print_response(response);
+            print_response(response, json);
         }
     }
 }
 
-fn print_response<S, P, F>(response: ux_model::result::UserResult<S, P, F>)
+fn print_response<S, P, F>(response: ux_model::result::UserResult<S, P, F>, json: bool)
 where
     S: ux_model::result::SuccessUserExpectations,
     P: ux_model::result::PartialSuccessUserExpectations,
     F: ux_model::result::FailureUserExpectations,
 {
-    match serde_json::to_string_pretty(&serde_json::json!({
-        "status": format!("{:?}", response.status()),
-        "summary": response.summary().0,
-        "details": format!("{:#?}", response),
-    })) {
-        Ok(payload) => println!("{payload}"),
-        Err(error) => {
-            eprintln!("Failed to serialize CLI outcome. Reason: {error}");
-            std::process::exit(1);
+    use ux_model::result::UserResult;
+    
+    if json {
+        // JSON output (original behavior)
+        match serde_json::to_string_pretty(&serde_json::json!({
+            "status": format!("{:?}", response.status()),
+            "summary": response.summary().0,
+            "details": format!("{:#?}", response),
+        })) {
+            Ok(payload) => println!("{payload}"),
+            Err(error) => {
+                eprintln!("Failed to serialize CLI outcome. Reason: {error}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        // Human-readable output (default)
+        match response {
+            UserResult::Success(_) => {
+                println!("✅ {}", response.summary().0);
+            }
+            UserResult::Partial(_) => {
+                println!("⚠️  {}", response.summary().0);
+            }
+            UserResult::Failure(_) => {
+                eprintln!("❌ {}", response.summary().0);
+                std::process::exit(1);
+            }
         }
     }
 }
