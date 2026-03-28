@@ -1,16 +1,17 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
 
 use crate::domain::graph::{
-    EdgeKind, GraphCompleteness, QualifiedSymbolName, SourceLocation, SymbolKind, SymbolName,
+    EdgeKind, QualifiedSymbolName, SourceLocation, SymbolKind, SymbolName,
     SymbolOrigin, TraversalDirection, TypeEdge, TypeGraph, TypeNode,
 };
 use crate::domain::language::{Language, LspServerConfig};
-use crate::infrastructure::{LspClient, LspClientError, Location, SymbolFinderError, HoverContents};
+use crate::infrastructure::{LspClient, LspClientError, Location, SymbolFinderError};
 
 /// Lazy graph builder - builds TypeGraph incrementally via LSP queries
 pub struct LazyGraphBuilder {
     lsp_client: LspClient,
+    #[allow(dead_code)]  // Used for validation, may be needed later
     workspace_root: PathBuf,
     language: Language,
 }

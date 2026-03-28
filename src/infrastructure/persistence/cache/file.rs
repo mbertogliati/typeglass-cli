@@ -1,11 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 use crate::domain::graph::{
-    GraphCompleteness, QualifiedSymbolName, SourceLocation, SymbolKind, SymbolName, 
-    SymbolOrigin, TraversalDirection, TypeGraph,
+    TraversalDirection, TypeGraph,
 };
-use crate::domain::language::Language;
 
 /// Simple file-based cache for TypeGraph results
 pub struct GraphCache {

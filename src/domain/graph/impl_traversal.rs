@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::domain::graph::{
-    EdgeKind, GraphCompleteness, PartialGraph, PartialResultSignal, QualifiedSymbolName,
-    SymbolKind, SymbolName, SymbolOrigin, TraversalDirection, TraversalFilter, TraversalProgress,
-    TraversalResult, TypeEdge, TypeGraph, TypeNode, UnresolvedReference,
+    PartialGraph, PartialResultSignal, QualifiedSymbolName, SymbolName, TraversalDirection, TraversalFilter, TraversalProgress,
+    TraversalResult, TypeEdge, TypeGraph, UnresolvedReference,
 };
 
 /// Graph traversal engine

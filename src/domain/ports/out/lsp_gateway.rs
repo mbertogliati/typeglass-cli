@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
-use crate::domain::graph::{QualifiedSymbolName, SourceLocation};
-use crate::domain::language::Language;
+use crate::domain::graph::SourceLocation;
 
 /// LSP Gateway - Output port for LSP communication
 /// 

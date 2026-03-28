@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 
 use crate::application::adapters::ApplicationAdapters;
 use crate::application::service::{ActionExecutor, ApplicationService};

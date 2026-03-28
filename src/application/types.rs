@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use sealed::sealed;
 
 use crate::ux_model::intent::{UserGoal, UserPromise};
 use crate::ux_model::result::*;

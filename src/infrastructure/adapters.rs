@@ -7,8 +7,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::application::adapters::ApplicationAdapters;
 use crate::domain::language::Language;
 use crate::domain::ports::*;
-use crate::infrastructure::lsp::init::LspClient;
-use crate::infrastructure::persistence::cache::file::GraphCache;
 
 /// Production adapters with real infrastructure wiring
 pub struct WiredAdapters {

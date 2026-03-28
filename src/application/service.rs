@@ -5,6 +5,7 @@ use crate::application::types::{ApplicationOutcome, CommandAction};
 
 /// El servicio de aplicación que orquesta la ejecución de comandos.
 pub struct ApplicationService<A: ApplicationAdapters> {
+    #[allow(dead_code)]  // Will be used when ports are fully wired
     pub(crate) adapters: A,
 }
 

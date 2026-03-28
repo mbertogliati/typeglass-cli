@@ -5,7 +5,6 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::path::WorkspacePath;
 use super::source::ContentHash;
 
 /// Metadata for a single file

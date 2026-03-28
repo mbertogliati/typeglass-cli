@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::source::ModulePath;
-use crate::domain::graph::{Position, SourceRange};
+use crate::domain::graph::SourceRange;
 
 /// Kind of import statement
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

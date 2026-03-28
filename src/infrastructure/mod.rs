@@ -10,7 +10,6 @@ pub use persistence::cache::{CacheError, GraphCache};
 pub use filesystem::{SymbolFinder, SymbolFinderError};
 
 
-pub use persistence::cache::file::*;
 pub use lsp::graph_builder::*;
 pub use lsp::client::*;
 pub use lsp::init::*;
