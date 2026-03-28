@@ -2,9 +2,8 @@
 use crate::application::adapters::ApplicationAdapters;
 use crate::application::service::{ActionExecutor, ApplicationService};
 use crate::application::types::{ApplicationOutcome, CommandAction, GenericSuccess, GenericFailure};
-use crate::domain::graph::TraversalDirection;
 use crate::domain::language::Language;
-use crate::infrastructure::LazyGraphBuilder;
+use crate::domain::ports::LspPort;
 use crate::ux_model::intent::{
     UserCommandContext, UserCommandFrom, UserGoal, UserGoalType, UserPromise, UserPromiseType,
 };
@@ -97,23 +96,64 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
             });
         };
 
-        // Build graph using LSP
+        // Build graph using LSP through port abstraction
         let max_depth = action.depth.unwrap_or(5);
-        let direction = TraversalDirection::Both;
-
-        let builder_result = LazyGraphBuilder::new(workspace_root.clone(), language).await;
         
-        let graph_result = match builder_result {
-            Ok(mut builder) => {
-                let graph = builder.build_from_symbol(&target_str, direction, max_depth).await;
-                let _ = builder.shutdown().await;
-                graph
+        // Create LSP query request using domain types
+        let depth = match crate::domain::lsp::Depth::new(max_depth) {
+            Ok(d) => d,
+            Err(e) => {
+                return UserResult::Failure(GenericFailure {
+                    promises: vec![
+                        UserPromise(UserPromiseType::NeverSilentWrong),
+                        UserPromise(UserPromiseType::ErrorsAreActionable),
+                    ],
+                    summary: UserSummary(format!("Invalid depth: {}", e)),
+                    limitations: vec![UserLimitation("Depth must be between 1 and 255".to_string())],
+                    next_step: UserNextStep("Use a depth value between 1 and 255".to_string()),
+                    context: UserResultContext {
+                        command_context: context,
+                    },
+                });
             }
-            Err(e) => Err(e),
+        };
+        
+        let lsp_request = crate::domain::ports::LspQueryRequest {
+            query: crate::domain::lsp::LspQuery::FromSymbol {
+                symbol: target_str.clone(),
+                depth,
+            },
+            timeout: crate::domain::lsp::QueryTimeout(std::time::Duration::from_secs(30)),
         };
 
+        // Clone the LSP adapter so it can be moved into the async context
+        // (The Arc makes this cheap - only the pointer is cloned)
+        let lsp_adapter = (*self.adapters.lsp()).clone();
+        
+        // Execute query through the port (NOT directly via LazyGraphBuilder)
+        let graph_result: Result<crate::domain::ports::LspQueryResponse, crate::domain::ports::LspPortError> = 
+            lsp_adapter.run_query(lsp_request).await;
+
         match graph_result {
-            Ok(graph) => {
+            Ok(response) => {
+                let graph = match response.graph {
+                    Some(g) => g,
+                    None => {
+                        return UserResult::Failure(GenericFailure {
+                            promises: vec![
+                                UserPromise(UserPromiseType::NeverSilentWrong),
+                                UserPromise(UserPromiseType::ErrorsAreActionable),
+                            ],
+                            summary: UserSummary(format!("No graph found for symbol '{}'", target_str)),
+                            limitations: vec![UserLimitation("LSP returned empty response".to_string())],
+                            next_step: UserNextStep("Check if the symbol exists in your workspace".to_string()),
+                            context: UserResultContext {
+                                command_context: context,
+                            },
+                        });
+                    }
+                };
+                
                 let node_count = graph.nodes().len();
                 let edge_count = graph.edges().len();
                 let completeness = if graph.is_complete() {

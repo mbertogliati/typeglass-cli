@@ -157,6 +157,11 @@ impl DaemonPort for DaemonAdapter {
 // LspAdapter - Real LSP integration
 // ============================================================================
 
+// ============================================================================
+// LspAdapter - Uses LazyGraphBuilder under the hood
+// ============================================================================
+
+#[derive(Clone)]  // Make cloneable so it can be moved into async blocks
 pub struct LspAdapter {
     workspace_root: PathBuf,
     language: Language,

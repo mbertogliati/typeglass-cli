@@ -4,7 +4,7 @@ pub trait ApplicationAdapters: Send + Sync {
     type Workspace: WorkspacePort + Send + Sync;
     type FileSystem: FileSystemPort + Send + Sync;
     type Daemon: DaemonPort + Send + Sync;
-    type Lsp: LspPort + Send + Sync;
+    type Lsp: LspPort + Send + Sync + Clone + 'static;  // Add 'static bound
     type Clock: ClockPort + Send + Sync;
 
     fn workspace(&self) -> &Self::Workspace;
@@ -57,6 +57,7 @@ impl DaemonPort for UnwiredDaemon {
     fn daemon_status<'a>(&'a self) -> Self::StatusFuture<'a> { panic!("DaemonPort is unwired") }
 }
 
+#[derive(Clone)]
 pub struct UnwiredLsp;
 impl LspPort for UnwiredLsp {
     type QueryFuture<'a> = std::future::Ready<Result<crate::domain::ports::LspQueryResponse, crate::domain::ports::LspPortError>>;
