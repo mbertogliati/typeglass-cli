@@ -1,7 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
-use crate::domain::graph::{TypeGraph, TraversalDirection};
+use crate::domain::graph::{
+    GraphCompleteness, QualifiedSymbolName, SourceLocation, SymbolKind, SymbolName, 
+    SymbolOrigin, TraversalDirection, TypeGraph,
+};
+use crate::domain::language::Language;
 
 /// Simple file-based cache for TypeGraph results
 pub struct GraphCache {
@@ -162,23 +166,35 @@ mod tests {
     fn test_cache_roundtrip() {
         let cache = GraphCache::new().unwrap();
         
+        let test_symbol = SymbolName("test".to_string());
         let graph = TypeGraph {
             nodes: HashMap::from([
-                ("test".to_string(), TypeNode {
-                    id: "test".to_string(),
-                    symbol_kind: SymbolKind::Struct,
-                    qualified_name: "Test".to_string(),
-                    source_file: None,
-                    metadata: HashMap::new(),
+                (test_symbol.clone(), TypeNode {
+                    id: QualifiedSymbolName {
+                        module_path: PathBuf::from("test"),
+                        symbol: test_symbol.clone(),
+                    },
+                    name: test_symbol.clone(),
+                    kind: SymbolKind::Struct,
+                    origin: SymbolOrigin::Canonical,
+                    location: SourceLocation {
+                        file: PathBuf::from("test.rs"),
+                        line: 1,
+                        column: 0,
+                    },
+                    language: Language::Rust,
+                    generic_parameters: vec![],
                 }),
             ]),
-            edges: HashMap::new(),
+            edges: vec![],
+            warnings: vec![],
+            completeness: GraphCompleteness::Complete,
         };
         
         cache.set("Test", 1, TraversalDirection::Both, &graph).unwrap();
         let cached = cache.get("Test", 1, TraversalDirection::Both).unwrap();
         
         assert_eq!(cached.nodes.len(), 1);
-        assert!(cached.nodes.contains_key("test"));
+        assert!(cached.nodes.contains_key(&test_symbol));
     }
 }
