@@ -150,6 +150,15 @@ impl LspProcess {
                 ))
             })?;
 
+        // EDGE CASE: Protect against LSP message size bombs (100 MB limit)
+        const MAX_LSP_MESSAGE_SIZE: usize = 100 * 1024 * 1024;
+        if length > MAX_LSP_MESSAGE_SIZE {
+            return Err(LspProcessError::ReadFailed(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("LSP message too large: {} bytes (max 100 MB)", length),
+            )));
+        }
+
         // Read empty line
         let mut empty = String::new();
         stdout
