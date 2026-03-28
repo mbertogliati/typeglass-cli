@@ -138,3 +138,99 @@ impl Default for NotificationBatch {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_lsp_notification_document_uri() {
+        let doc = TextDocument::new(
+            "file:///test.rs".to_string(),
+            "rust".to_string(),
+            1,
+            "content".to_string(),
+        );
+        let notif = LspNotification::DidOpen { document: doc };
+        assert_eq!(notif.document_uri(), "file:///test.rs");
+    }
+
+    #[test]
+    fn test_lsp_notification_is_content_change() {
+        let doc = TextDocument::new("file:///test.rs".into(), "rust".into(), 1, "".into());
+        assert!(LspNotification::DidOpen { document: doc.clone() }.is_content_change());
+        
+        let doc_id = DocumentIdentifier { uri: "file:///test.rs".into(), version: Some(2) };
+        assert!(LspNotification::DidChange { document: doc_id.clone(), changes: vec![] }.is_content_change());
+        assert!(!LspNotification::DidSave { document: doc_id.clone() }.is_content_change());
+    }
+
+    #[test]
+    fn test_lsp_notification_is_open_close() {
+        let doc = TextDocument::new("file:///test.rs".into(), "rust".into(), 1, "".into());
+        let open = LspNotification::DidOpen { document: doc };
+        assert!(open.is_open());
+        assert!(!open.is_close());
+        
+        let doc_id = DocumentIdentifier { uri: "file:///test.rs".into(), version: None };
+        let close = LspNotification::DidClose { document: doc_id };
+        assert!(!close.is_open());
+        assert!(close.is_close());
+    }
+
+    #[test]
+    fn test_text_document_line_count() {
+        let doc = TextDocument::new(
+            "file:///test".into(),
+            "rust".into(),
+            1,
+            "line1\nline2\nline3".into(),
+        );
+        assert_eq!(doc.line_count(), 3);
+    }
+
+    #[test]
+    fn test_text_document_char_count() {
+        let doc = TextDocument::new(
+            "file:///test".into(),
+            "rust".into(),
+            1,
+            "hello world".into(),
+        );
+        assert_eq!(doc.char_count(), 11);
+    }
+
+    #[test]
+    fn test_text_document_content_change_full() {
+        let change = TextDocumentContentChange::full_document("new text".into());
+        assert!(change.is_full_document());
+        assert!(!change.is_incremental());
+    }
+
+    #[test]
+    fn test_text_document_content_change_incremental() {
+        let range = SourceRange {
+            file: PathBuf::from("test.rs"),
+            start: crate::domain::graph::Position { line: 0, column: 0 },
+            end: crate::domain::graph::Position { line: 0, column: 5 },
+        };
+        let change = TextDocumentContentChange::incremental(range, "text".into());
+        assert!(!change.is_full_document());
+        assert!(change.is_incremental());
+    }
+
+    #[test]
+    fn test_notification_batch_operations() {
+        let mut batch = NotificationBatch::new();
+        assert!(batch.is_empty());
+        assert_eq!(batch.count(), 0);
+        
+        let doc = TextDocument::new("file:///test".into(), "rust".into(), 1, "".into());
+        batch.add(LspNotification::DidOpen { document: doc });
+        
+        assert!(!batch.is_empty());
+        assert_eq!(batch.count(), 1);
+        assert_eq!(batch.notifications.len(), 1);
+    }
+}
