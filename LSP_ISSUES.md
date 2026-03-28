@@ -2,7 +2,7 @@
 
 This document tracks issues discovered during LSP integration testing and their systematic resolution.
 
-## ✅ Fixed Issues (7)
+## ✅ Fixed Issues (9)
 
 ### LSP-001: rust-analyzer needs indexing time ✅
 - **Problem**: After `initialize`, rust-analyzer returns "file not found" because it's still indexing
@@ -103,10 +103,14 @@ This document tracks issues discovered during LSP integration testing and their 
 - **Fix**: Exponential backoff for specific error codes
 - **Status**: Open (nice to have)
 
-**LSP-008: No health check after initialization**
-- **Problem**: Assume LSP ready after `initialize`, should verify
-- **Solution**: Current `wait_for_indexing()` serves as health check
-- **Status**: Open (already handled by wait logic)
+### LSP-008: Health check after initialization ✅
+- **Problem**: Should verify LSP actually responds after `initialize`
+- **Solution**: `wait_for_indexing()` already serves as health check
+- **Implementation**: 
+  - Polls workspace/symbol after initialize
+  - Waits until LSP returns non-empty symbol list
+  - Up to 20 attempts with 1s intervals (20s total)
+- **Status**: ✅ FIXED (already implemented in LSP-001)
 
 ---
 
