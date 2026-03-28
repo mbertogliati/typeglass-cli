@@ -112,7 +112,7 @@ impl LazyGraphBuilder {
                 let node = self.location_to_type_node(&symbol, def);
                 graph.add_node(node);
                 
-                // Now find references to build edges (LSP-002 continuation)
+                // Now find references to build edges
                 eprintln!("DEBUG: Finding references for {} at {}:{}:{}", 
                     symbol.0, file_uri, location.line, location.character);
                 
@@ -123,26 +123,18 @@ impl LazyGraphBuilder {
                     false // don't include declaration
                 ).await {
                     Ok(references) => {
-                        eprintln!("DEBUG: Found {} references", references.len());
+                        eprintln!("DEBUG: Got {} reference locations", references.len());
                         
-                        // Each reference represents a potential edge
-                        for reference in references {
-                            let ref_location = parse_lsp_location(&reference)?;
-                            
-                            // Determine the symbol at this reference location
-                            // For now, we'll create edges to symbols we haven't visited yet
-                            // In a complete implementation, we'd query the symbol name at each ref
-                            
-                            // Check if we should traverse deeper
-                            if depth + 1 < max_depth {
-                                // Add to queue for traversal
-                                // Note: We'd need to resolve the symbol name at ref_location
-                                // This requires additional LSP queries (hover or documentSymbol)
-                                
-                                // For MVP: Create edge but don't traverse yet
-                                // We'll implement full traversal in the next phase
-                            }
-                        }
+                        // For each reference, we need to determine which symbol uses it
+                        // This requires querying hover or documentSymbol at the reference location
+                        // For MVP: Count references but don't traverse yet
+                        // Full implementation would:
+                        // 1. For each reference location
+                        // 2. Query hover to get the containing symbol name
+                        // 3. Create TypeEdge from that symbol to current symbol
+                        // 4. Add to queue if depth allows
+                        
+                        // TODO: Implement in next phase (graph-recursive-traversal)
                     }
                     Err(e) => {
                         eprintln!("DEBUG: Failed to find references: {}", e);

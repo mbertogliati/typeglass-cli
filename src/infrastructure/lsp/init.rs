@@ -447,6 +447,29 @@ pub struct SymbolInformation {
     pub container_name: Option<String>,
 }
 
+/// LSP Hover response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HoverResponse {
+    pub contents: HoverContents,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<Range>,
+}
+
+/// Hover contents can be various formats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum HoverContents {
+    Scalar(String),
+    Array(Vec<String>),
+    Markup(MarkupContent),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarkupContent {
+    pub kind: String, // "plaintext" or "markdown"
+    pub value: String,
+}
+
 impl Drop for LspClient {
     fn drop(&mut self) {
         // Best effort shutdown
