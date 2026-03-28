@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use url::Url;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::infrastructure::lsp::client::{LspProcess, LspProcessError};
@@ -134,8 +135,13 @@ impl LspClient {
         // Start the process
         self.process.start().await?;
 
-        // Send initialize request
-        let root_uri = format!("file://{}", workspace_root.display());
+        // LSP-003 fix: Proper file URI encoding
+        let root_uri = Url::from_file_path(&workspace_root)
+            .map_err(|_| LspClientError::InvalidResponse(
+                format!("Invalid workspace path: {}", workspace_root.display())
+            ))?
+            .to_string();
+        
         let params = InitializeParams {
             root_uri,
             capabilities: ClientCapabilities {
@@ -551,7 +557,10 @@ mod tests {
         // Try an immediate query - should not fail with "file not found"
         let test_file = workspace.join("src/lib.rs");
         if test_file.exists() {
-            let file_uri = format!("file://{}", test_file.display());
+            let file_uri = Url::from_file_path(&test_file)
+                .map_err(|_| format!("Invalid file path: {}", test_file.display()))
+                .unwrap()
+                .to_string();
             let result = client.query_definition(&file_uri, 0, 0).await;
             
             // Key improvement: rust-analyzer has had time to index

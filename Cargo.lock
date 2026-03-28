@@ -1292,6 +1292,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tower-lsp",
+ "url",
  "uuid",
  "which",
 ]
