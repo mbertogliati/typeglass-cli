@@ -2,7 +2,7 @@
 
 This document tracks issues discovered during LSP integration testing and their systematic resolution.
 
-## ✅ Fixed Issues (6)
+## ✅ Fixed Issues (7)
 
 ### LSP-001: rust-analyzer needs indexing time ✅
 - **Problem**: After `initialize`, rust-analyzer returns "file not found" because it's still indexing
@@ -68,13 +68,23 @@ This document tracks issues discovered during LSP integration testing and their 
 - **Fix**: Structured error context with file, LSP response, actions
 - **Status**: Open
 
-**LSP-005: No trace/debug logs for LSP communication**
-- **Problem**: Debug logs use `eprintln!`, should use proper logging framework
-- **Test**: `test_lsp_tracing`
-- **Fix**: Add `tracing` crate with structured logging
-- **Status**: Open (eprintln works but not configurable)
+### LSP-005: Debug logs now use standard log crate ✅
+- **Problem**: Debug logs used custom `debug_log!` macro instead of ecosystem standard
+- **Solution**: Replaced with `log::debug!` from log crate
+- **Implementation**: 
+  - Removed custom macros from init.rs and graph_builder.rs
+  - Using `log::debug!` for all debug statements
+  - env_logger configured in main.rs: RUST_LOG=warn (default) or debug (--debug)
+  - All logs now have timestamps and module paths
+- **Status**: ✅ FIXED (standard Rust logging ecosystem)
 
-**LSP-007: No timeout on LSP requests**
+---
+
+## 🔴 Open Issues (5)
+
+### 🟡 Major (3)
+
+**LSP-003: File URI encoding may be incorrect**
 - **Problem**: Requests can hang indefinitely if LSP stalls
 - **Test**: `test_lsp_request_timeout`
 - **Fix**: Add `tokio::time::timeout` with configurable duration
