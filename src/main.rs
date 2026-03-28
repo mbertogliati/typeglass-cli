@@ -2,6 +2,7 @@ use typeglass_cli::application;
 use typeglass_cli::infrastructure::cli;
 use typeglass_cli::ux_model;
 use typeglass_cli::infrastructure::cli::UserRequest;
+use clap::Parser;
 
 #[tokio::main]
 async fn main() {
@@ -10,6 +11,11 @@ async fn main() {
     let args = cli::parse_cli();
     let request = match cli::resolve_intent(args) {
         Ok(request) => request,
+        Err(cli::IntentResolutionError::ShowHelp) => {
+            // Print help and exit gracefully
+            cli::CliArgs::parse_from(&["typeglass", "--help"]);
+            unreachable!("clap will print help and exit");
+        }
         Err(error) => {
             eprintln!("{error}");
             std::process::exit(2);

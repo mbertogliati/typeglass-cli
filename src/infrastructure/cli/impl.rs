@@ -42,6 +42,8 @@ pub fn resolve_from_args(args: FromArgs) -> Result<ResolvedFromCommand, FromArgs
 pub enum IntentResolutionError {
     #[error("Cannot resolve `from` command. Reason: {source}")]
     InvalidFromCommand { source: FromArgsError },
+    #[error("No command provided. Use --help to see available commands.")]
+    ShowHelp,
 }
 
 pub enum UserRequest {
@@ -57,7 +59,15 @@ pub fn resolve_intent(args: CliArgs) -> Result<UserRequest, IntentResolutionErro
         user_workspace: UserWorkspace::Pwd,
     };
 
-    match args.command {
+    let command = match args.command {
+        Some(cmd) => cmd,
+        None => {
+            // No command provided - show help and exit gracefully
+            return Err(IntentResolutionError::ShowHelp);
+        }
+    };
+
+    match command {
         CliCommand::From(from_args) => {
             let resolved = resolve_from_args(from_args)
                 .map_err(|source| IntentResolutionError::InvalidFromCommand { source })?;
