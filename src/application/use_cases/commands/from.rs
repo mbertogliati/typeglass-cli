@@ -3,12 +3,13 @@ use std::path::PathBuf;
 use crate::application::adapters::ApplicationAdapters;
 use crate::application::service::{ActionExecutor, ApplicationService};
 use crate::application::types::{ApplicationOutcome, CommandAction, GenericSuccess};
-use crate::domain::graph::{
-    GraphTraversal, QualifiedSymbolName, SymbolName, TraversalDirection, TraversalFilter,
-    TypeGraph,
+use crate::domain::graph::TraversalDirection;
+use crate::domain::language::Language;
+use crate::infrastructure::LazyGraphBuilder;
+use crate::ux_model::intent::{
+    UserCommandContext, UserCommandFrom, UserGoal, UserGoalType, UserPromise, UserPromiseType,
 };
-use crate::ux_model::intent::{UserCommandContext, UserCommandFrom, UserGoal, UserGoalType, UserPromise, UserPromiseType};
-use crate::ux_model::result::{UserResult, UserResultContext, UserSummary, UserNextStep, UserLimitation};
+use crate::ux_model::result::{UserLimitation, UserNextStep, UserResult, UserResultContext, UserSummary};
 
 impl CommandAction for UserCommandFrom {
     type Success = GenericSuccess;
@@ -22,14 +23,10 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
         action: UserCommandFrom,
         context: UserCommandContext,
     ) -> ApplicationOutcome<UserCommandFrom> {
-        // For now, create a mock graph until we have LSP integration
-        // TODO: Replace with actual LSP queries to build real graph
-        let graph = create_mock_graph();
-
         // Extract symbol name from target
         let target_str = match &action.target {
             crate::ux_model::intent::FromTarget::Symbol(s) => s.clone(),
-            crate::ux_model::intent::FromTarget::File(_) 
+            crate::ux_model::intent::FromTarget::File(_)
             | crate::ux_model::intent::FromTarget::Module(_)
             | crate::ux_model::intent::FromTarget::PublicExports => {
                 return UserResult::Failure(crate::application::types::GenericFailure {
@@ -38,7 +35,9 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
                         UserPromise(UserPromiseType::ErrorsAreExplicit),
                     ],
                     summary: UserSummary("Only symbol-based traversal is currently implemented".to_string()),
-                    limitations: vec![UserLimitation("File, module, and public exports traversal are not yet supported".to_string())],
+                    limitations: vec![UserLimitation(
+                        "File, module, and public exports traversal are not yet supported".to_string(),
+                    )],
                     next_step: UserNextStep("Use a symbol name instead, e.g., 'typeglass from MyType'".to_string()),
                     context: UserResultContext {
                         command_context: context,
@@ -47,121 +46,101 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
             }
         };
 
-        // Parse the target symbol
-        let symbol_name = match SymbolName::new(target_str.clone()) {
-            Ok(name) => name,
-            Err(_) => {
-                return UserResult::Failure(crate::application::types::GenericFailure {
+        // Get workspace root
+        let workspace_root = match &context.user_workspace {
+            crate::ux_model::intent::UserWorkspace::Explicit(path) => path.clone(),
+            crate::ux_model::intent::UserWorkspace::Pwd => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        };
+
+        // Detect language (simplified - just check for Rust for now)
+        let language = if workspace_root.join("Cargo.toml").exists() {
+            Language::Rust
+        } else if workspace_root.join("package.json").exists() {
+            Language::TypeScript
+        } else if workspace_root.join("go.mod").exists() {
+            Language::Go
+        } else {
+            return UserResult::Failure(crate::application::types::GenericFailure {
+                promises: vec![
+                    UserPromise(UserPromiseType::NeverSilentWrong),
+                    UserPromise(UserPromiseType::ErrorsAreActionable),
+                ],
+                summary: UserSummary("Could not detect project language".to_string()),
+                limitations: vec![
+                    UserLimitation("No Cargo.toml, package.json, or go.mod found".to_string()),
+                ],
+                next_step: UserNextStep(
+                    "Run from a Rust, TypeScript, or Go project root directory".to_string(),
+                ),
+                context: UserResultContext {
+                    command_context: context,
+                },
+            });
+        };
+
+        // Build graph using LSP
+        let max_depth = action.depth.unwrap_or(5);
+        let direction = TraversalDirection::Both;
+
+        let builder_result = LazyGraphBuilder::new(workspace_root.clone(), language).await;
+        
+        let graph_result = match builder_result {
+            Ok(mut builder) => {
+                let graph = builder.build_from_symbol(&target_str, direction, max_depth).await;
+                let _ = builder.shutdown().await;
+                graph
+            }
+            Err(e) => Err(e),
+        };
+
+        match graph_result {
+            Ok(graph) => {
+                let node_count = graph.nodes().len();
+                let edge_count = graph.edges().len();
+                let completeness = if graph.is_complete() {
+                    "complete"
+                } else {
+                    "partial"
+                };
+
+                let summary = format!(
+                    "Found {} nodes and {} edges from '{}' ({} graph, language: {:?})",
+                    node_count, edge_count, target_str, completeness, language
+                );
+
+                UserResult::Success(GenericSuccess {
+                    goal: UserGoal(UserGoalType::UnderstandCodebaseDomain),
                     promises: vec![
                         UserPromise(UserPromiseType::NeverSilentWrong),
-                        UserPromise(UserPromiseType::ErrorsAreExplicit),
+                        UserPromise(UserPromiseType::FastByDefault),
+                        UserPromise(UserPromiseType::PartialResultsAreExplicit),
                     ],
-                    summary: UserSummary(format!("Invalid symbol name: {}", target_str)),
-                    limitations: vec![UserLimitation("Symbol names cannot be empty or contain whitespace".to_string())],
-                    next_step: UserNextStep("Provide a valid symbol name".to_string()),
+                    summary: UserSummary(summary),
+                    next_step: Some(UserNextStep(
+                        "Graph built from LSP. Use --format json for detailed output.".to_string(),
+                    )),
                     context: UserResultContext {
                         command_context: context,
                     },
-                });
+                })
             }
-        };
-
-        // Create qualified symbol name (mock module path for now)
-        let entry_point = QualifiedSymbolName {
-            module_path: PathBuf::from("mock.ts"),
-            symbol: symbol_name,
-        };
-
-        // Use default direction (Both) and filter
-        let direction = TraversalDirection::Both;
-        let filter = TraversalFilter::default();
-
-        // Execute traversal
-        let max_depth = action.depth.unwrap_or(5);
-        let mut traversal = GraphTraversal::new(max_depth);
-        let result = traversal.traverse(&graph, &entry_point, direction, &filter);
-
-        // Format results
-        let node_count = result.graph.nodes().len();
-        let edge_count = result.graph.edges().len();
-        let completeness = if result.graph.is_complete() {
-            "complete"
-        } else {
-            "partial"
-        };
-
-        let summary = format!(
-            "Found {} nodes and {} edges from '{}' ({} graph, max depth: {})",
-            node_count, edge_count, target_str, completeness, result.max_depth_reached
-        );
-
-        UserResult::Success(GenericSuccess {
-            goal: UserGoal(UserGoalType::UnderstandCodebaseDomain),
-            promises: vec![
-                UserPromise(UserPromiseType::NeverSilentWrong),
-                UserPromise(UserPromiseType::FastByDefault),
-                UserPromise(UserPromiseType::PartialResultsAreExplicit),
-            ],
-            summary: UserSummary(summary),
-            next_step: Some(UserNextStep(
-                "Graph traversal complete. Use --format json for detailed output.".to_string(),
-            )),
-            context: UserResultContext {
-                command_context: context,
-            },
-        })
+            Err(e) => {
+                UserResult::Failure(crate::application::types::GenericFailure {
+                    promises: vec![
+                        UserPromise(UserPromiseType::NeverSilentWrong),
+                        UserPromise(UserPromiseType::ErrorsAreActionable),
+                    ],
+                    summary: UserSummary(format!("Failed to build graph: {}", e)),
+                    limitations: vec![UserLimitation(format!("LSP error: {}", e))],
+                    next_step: UserNextStep(
+                        "Check that LSP is installed (run 'typeglass doctor')".to_string(),
+                    ),
+                    context: UserResultContext {
+                        command_context: context,
+                    },
+                })
+            }
+        }
     }
 }
 
-// Mock graph builder - TODO: Replace with real LSP-based graph builder
-fn create_mock_graph() -> TypeGraph {
-    use crate::domain::graph::{EdgeKind, SourceLocation, SymbolKind, SymbolOrigin, TypeEdge, TypeNode};
-    use crate::domain::language::Language;
-
-    let mut graph = TypeGraph::empty();
-
-    // Add some mock nodes
-    let node_a = TypeNode {
-        id: QualifiedSymbolName {
-            module_path: PathBuf::from("mock.ts"),
-            symbol: SymbolName("TypeA".to_string()),
-        },
-        name: SymbolName("TypeA".to_string()),
-        kind: SymbolKind::Struct,
-        origin: SymbolOrigin::Canonical,
-        location: SourceLocation {
-            file: PathBuf::from("mock.ts"),
-            line: 10,
-            column: 1,
-        },
-        language: Language::TypeScript,
-        generic_parameters: vec![],
-    };
-
-    let node_b = TypeNode {
-        id: QualifiedSymbolName {
-            module_path: PathBuf::from("mock.ts"),
-            symbol: SymbolName("TypeB".to_string()),
-        },
-        name: SymbolName("TypeB".to_string()),
-        kind: SymbolKind::Struct,
-        origin: SymbolOrigin::Canonical,
-        location: SourceLocation {
-            file: PathBuf::from("mock.ts"),
-            line: 20,
-            column: 1,
-        },
-        language: Language::TypeScript,
-        generic_parameters: vec![],
-    };
-
-    graph.add_node(node_a);
-    graph.add_node(node_b);
-    graph.add_edge(TypeEdge {
-        from: SymbolName("TypeA".to_string()),
-        to: SymbolName("TypeB".to_string()),
-        kind: EdgeKind::Contains,
-    });
-
-    graph
-}

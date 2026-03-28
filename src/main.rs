@@ -1,8 +1,7 @@
-mod application;
 mod cli;
-mod domain;
-mod ux_model;
 
+use typeglass_cli::application;
+use typeglass_cli::ux_model;
 use crate::cli::UserRequest;
 
 #[tokio::main]
