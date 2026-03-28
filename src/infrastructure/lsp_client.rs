@@ -28,6 +28,14 @@ pub enum LspProcessError {
     
     #[error("Failed to read from LSP stdout: {0}")]
     ReadFailed(std::io::Error),
+    
+    #[error("LSP server returned unexpected output. This may indicate:\n\
+             - The server binary is not an LSP server\n\
+             - The server crashed on startup\n\
+             - The server requires additional configuration\n\n\
+             Run 'typeglass doctor' to check LSP installation.\n\
+             Got: {output}")]
+    UnexpectedOutput { output: String },
 }
 
 impl LspProcess {
@@ -126,10 +134,9 @@ impl LspProcess {
             .map_err(LspProcessError::ReadFailed)?;
 
         if !header.starts_with("Content-Length:") {
-            return Err(LspProcessError::ReadFailed(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Expected Content-Length header, got: {}", header),
-            )));
+            return Err(LspProcessError::UnexpectedOutput { 
+                output: header.trim().to_string() 
+            });
         }
 
         let length: usize = header
