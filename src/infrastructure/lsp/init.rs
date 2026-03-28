@@ -125,7 +125,33 @@ impl LspClient {
 
         self.initialized = true;
 
+        // LSP-001 fix: Wait for LSP server to finish indexing
+        // rust-analyzer and other servers need time after initialize
+        self.wait_for_indexing().await?;
+
         Ok(response)
+    }
+
+    /// Wait for LSP server to finish indexing workspace (LSP-001)
+    /// Polls with lightweight workspace/symbol requests until ready
+    async fn wait_for_indexing(&mut self) -> Result<(), LspClientError> {
+        use tokio::time::{sleep, Duration};
+
+        // Poll up to 10 times with 500ms intervals (5 seconds total)
+        for attempt in 0..10 {
+            if attempt > 0 {
+                sleep(Duration::from_millis(500)).await;
+            }
+
+            // Try workspace/symbol query (lightweight check)
+            match self.send_request("workspace/symbol", serde_json::json!({"query": ""})).await {
+                Ok(_) => return Ok(()), // Server responded, it's ready
+                Err(_) => continue, // Try again
+            }
+        }
+
+        // Proceed anyway if polling fails - better than blocking forever
+        Ok(())
     }
 
     /// Send a request and wait for response
@@ -305,6 +331,36 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // Note: Real LSP initialization tests require LSP binary installed
-    // Integration tests will cover the full flow with rust-analyzer
+    // LSP-001: Test that we wait for indexing after initialize
+    #[tokio::test]
+    #[ignore] // Requires rust-analyzer to be installed
+    async fn test_lsp_init_waits_for_indexing() {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let config = LspServerConfig::for_language(Language::Rust)
+            .expect("Rust LSP config should exist");
+
+        let mut client = LspClient::new(config);
+        
+        // Initialize (which now includes waiting)
+        let init_result = client.initialize(workspace.clone()).await;
+        assert!(init_result.is_ok(), "Initialize should succeed: {:?}", init_result.err());
+
+        // Try an immediate query - should not fail with "file not found"
+        let test_file = workspace.join("src/lib.rs");
+        if test_file.exists() {
+            let file_uri = format!("file://{}", test_file.display());
+            let result = client.query_definition(&file_uri, 0, 0).await;
+            
+            // Key improvement: rust-analyzer has had time to index
+            match result {
+                Ok(_) => {}, // Success is good
+                Err(LspClientError::InvalidResponse(msg)) => {
+                    // Should not be "file not found" anymore
+                    assert!(!msg.contains("file not found"), 
+                        "Should not get 'file not found' after waiting for indexing: {}", msg);
+                }
+                Err(e) => panic!("Unexpected error: {:?}", e),
+            }
+        }
+    }
 }
