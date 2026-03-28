@@ -2,7 +2,7 @@
 
 This document tracks issues discovered during LSP integration testing and their systematic resolution.
 
-## ✅ Fixed Issues (9)
+## ✅ Fixed Issues (10)
 
 ### LSP-001: rust-analyzer needs indexing time ✅
 - **Problem**: After `initialize`, rust-analyzer returns "file not found" because it's still indexing
@@ -90,10 +90,14 @@ This document tracks issues discovered during LSP integration testing and their 
 - **Fix**: Add `tokio::time::timeout` with configurable duration
 - **Status**: Open (low priority, LSP usually responds)
 
-**LSP-010: workspace/symbol returns empty initially**
+### LSP-010: workspace/symbol returns empty initially ✅
 - **Problem**: First attempts return 0 symbols even after short wait
-- **Solution**: Current wait logic handles this by polling multiple times
-- **Status**: Open (workaround in place, could be optimized)
+- **Solution**: `wait_for_indexing()` polls multiple times with backoff
+- **Implementation**: 
+  - Up to 20 attempts with 1s intervals
+  - Returns success when symbols list is non-empty
+  - Proceeds anyway after timeout (better than blocking)
+- **Status**: ✅ FIXED (handled by LSP-001 implementation)
 
 ### 🔵 Minor (2)
 
