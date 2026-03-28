@@ -56,18 +56,18 @@ impl WorkspacePort for WorkspaceAdapter {
     type ProbeFuture<'a> = Pin<Box<dyn Future<Output = Result<WorkspaceSnapshot, WorkspacePortError>> + Send + 'a>>;
 
     fn probe_workspace<'a>(&'a self, probe: WorkspaceProbe) -> Self::ProbeFuture<'a> {
-        let root = self.root.clone();
+        let _root = self.root.clone();
         let language = self.language;
         
         Box::pin(async move {
             let path = crate::domain::workspace::WorkspacePath::new(probe.requested_path.clone())
-                .map_err(|e| WorkspacePortError::ProbeFailed {
+                .map_err(|_e| WorkspacePortError::ProbeFailed {
                     path: probe.requested_path.clone(),
-                    reason: format!("Invalid workspace path: {}", e),
+                    reason: "Invalid workspace path".to_string(),
                 })?;
             
             let identity = crate::domain::workspace::WorkspaceIdentity::new("temp-id".to_string())
-                .map_err(|e| WorkspacePortError::IdentityUnavailable {
+                .map_err(|_e| WorkspacePortError::IdentityUnavailable {
                     path: probe.requested_path,
                 })?;
 
