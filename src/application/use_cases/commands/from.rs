@@ -28,7 +28,7 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
             crate::ux_model::intent::FromTarget::File(_)
             | crate::ux_model::intent::FromTarget::Module(_)
             | crate::ux_model::intent::FromTarget::PublicExports => {
-                return UserResult::Failure(crate::application::types::GenericFailure {
+                return UserResult::Failure(GenericFailure {
                     promises: vec![
                         UserPromise(UserPromiseType::NeverSilentWrong),
                         UserPromise(UserPromiseType::ErrorsAreExplicit),
