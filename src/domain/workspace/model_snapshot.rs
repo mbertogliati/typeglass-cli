@@ -181,3 +181,121 @@ pub enum FileTreeError {
     #[error("Path is not a directory: {path}")]
     NotADirectory { path: PathBuf },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_snapshot_hash_deterministic() {
+        let files = HashMap::new();
+        let h1 = SnapshotHash::compute(&files);
+        let h2 = SnapshotHash::compute(&files);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_file_tree_snapshot_empty() {
+        let snap = FileTreeSnapshot::empty(PathBuf::from("/tmp"));
+        assert_eq!(snap.root(), &PathBuf::from("/tmp"));
+        assert_eq!(snap.file_count(), 0);
+    }
+
+    #[test]
+    fn test_file_tree_snapshot_new() {
+        let mut files = HashMap::new();
+        files.insert(PathBuf::from("a.rs"), FileMetadata { size: 100, modified: None, hash: None });
+        
+        let snap = FileTreeSnapshot::new(PathBuf::from("/tmp"), files, vec![]);
+        assert_eq!(snap.file_count(), 1);
+    }
+
+    #[test]
+    fn test_has_changed() {
+        let s1 = FileTreeSnapshot::empty(PathBuf::from("/tmp"));
+        let s2 = FileTreeSnapshot::empty(PathBuf::from("/tmp"));
+        assert!(!s1.has_changed(&s2));
+    }
+
+    #[test]
+    fn test_diff_empty() {
+        let s1 = FileTreeSnapshot::empty(PathBuf::from("/tmp"));
+        let s2 = FileTreeSnapshot::empty(PathBuf::from("/tmp"));
+        let diff = s1.diff(&s2);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_diff_additions() {
+        let s1 = FileTreeSnapshot::empty(PathBuf::from("/tmp"));
+        
+        let mut files = HashMap::new();
+        files.insert(PathBuf::from("new.rs"), FileMetadata { size: 1, modified: None, hash: None });
+        let s2 = FileTreeSnapshot::new(PathBuf::from("/tmp"), files, vec![]);
+        
+        let diff = s1.diff(&s2);
+        assert!(diff.has_additions());
+        assert!(diff.added.contains(&PathBuf::from("new.rs")));
+    }
+
+    #[test]
+    fn test_diff_deletions() {
+        let mut files = HashMap::new();
+        files.insert(PathBuf::from("old.rs"), FileMetadata { size: 1, modified: None, hash: None });
+        let s1 = FileTreeSnapshot::new(PathBuf::from("/tmp"), files, vec![]);
+        
+        let s2 = FileTreeSnapshot::empty(PathBuf::from("/tmp"));
+        
+        let diff = s1.diff(&s2);
+        assert!(diff.has_deletions());
+        assert!(diff.deleted.contains(&PathBuf::from("old.rs")));
+    }
+
+    #[test]
+    fn test_diff_modifications() {
+        let mut files1 = HashMap::new();
+        files1.insert(PathBuf::from("file.rs"), FileMetadata { size: 100, modified: None, hash: None });
+        let s1 = FileTreeSnapshot::new(PathBuf::from("/tmp"), files1, vec![]);
+        
+        let mut files2 = HashMap::new();
+        files2.insert(PathBuf::from("file.rs"), FileMetadata { size: 200, modified: None, hash: None });
+        let s2 = FileTreeSnapshot::new(PathBuf::from("/tmp"), files2, vec![]);
+        
+        let diff = s1.diff(&s2);
+        assert!(diff.has_modifications());
+        assert!(diff.modified.contains(&PathBuf::from("file.rs")));
+    }
+
+    #[test]
+    fn test_contains_file() {
+        let mut files = HashMap::new();
+        files.insert(PathBuf::from("exists.rs"), FileMetadata { size: 1, modified: None, hash: None });
+        
+        let snap = FileTreeSnapshot::new(PathBuf::from("/tmp"), files, vec![]);
+        assert!(snap.contains_file(&PathBuf::from("exists.rs")));
+        assert!(!snap.contains_file(&PathBuf::from("missing.rs")));
+    }
+
+    #[test]
+    fn test_all_files() {
+        let mut files = HashMap::new();
+        files.insert(PathBuf::from("a.rs"), FileMetadata { size: 1, modified: None, hash: None });
+        files.insert(PathBuf::from("b.rs"), FileMetadata { size: 2, modified: None, hash: None });
+        
+        let snap = FileTreeSnapshot::new(PathBuf::from("/tmp"), files, vec![]);
+        assert_eq!(snap.all_files().len(), 2);
+    }
+
+    #[test]
+    fn test_diff_total_changes() {
+        let s1 = FileTreeSnapshot::empty(PathBuf::from("/tmp"));
+        
+        let mut files = HashMap::new();
+        files.insert(PathBuf::from("new.rs"), FileMetadata { size: 1, modified: None, hash: None });
+        let s2 = FileTreeSnapshot::new(PathBuf::from("/tmp"), files, vec![]);
+        
+        let diff = s1.diff(&s2);
+        assert_eq!(diff.total_changes(), 1);
+    }
+}
