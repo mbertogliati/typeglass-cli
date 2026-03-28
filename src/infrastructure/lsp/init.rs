@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::lsp_client::{LspProcess, LspProcessError};
+use crate::infrastructure::lsp::client::{LspProcess, LspProcessError};
 use crate::domain::language::LspServerConfig;
 
 /// LSP client with initialization and request/response handling

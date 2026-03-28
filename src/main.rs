@@ -1,8 +1,7 @@
-mod cli;
-
 use typeglass_cli::application;
+use typeglass_cli::infrastructure::cli;
 use typeglass_cli::ux_model;
-use crate::cli::UserRequest;
+use typeglass_cli::infrastructure::cli::UserRequest;
 
 #[tokio::main]
 async fn main() {

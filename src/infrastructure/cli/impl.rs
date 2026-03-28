@@ -2,7 +2,7 @@ use clap::Parser;
 use thiserror::Error;
 
 use super::types::{CliArgs, FromArgs, FromArgsError, QueryTarget, ResolvedFromCommand};
-use crate::cli::CliCommand;
+use crate::infrastructure::cli::CliCommand;
 use crate::ux_model::intent::{
     UserCommandContext, UserCommandDoctor, UserCommandFrom, UserCommandGc, UserCommandInit,
     UserCommandInteractive, UserWorkspace,

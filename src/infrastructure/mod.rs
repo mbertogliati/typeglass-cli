@@ -1,11 +1,16 @@
-pub mod cache;
-pub mod graph_builder;
-pub mod lsp_client;
-pub mod lsp_init;
-pub mod symbol_finder;
+pub mod cli;
+pub mod lsp;
+pub mod persistence;
+pub mod filesystem;
 
-pub use cache::*;
-pub use graph_builder::*;
-pub use lsp_client::*;
-pub use lsp_init::*;
-pub use symbol_finder::*;
+// Re-export commonly used types
+pub use lsp::{LazyGraphBuilder, LspClient, LspProcess};
+pub use persistence::cache::{CacheError, GraphCache};
+pub use filesystem::{SymbolFinder, SymbolFinderError};
+
+
+pub use persistence::cache::file::*;
+pub use lsp::graph_builder::*;
+pub use lsp::client::*;
+pub use lsp::init::*;
+pub use filesystem::scanner::*;
