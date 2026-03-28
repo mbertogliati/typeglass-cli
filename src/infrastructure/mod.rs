@@ -2,6 +2,7 @@ pub mod cli;
 pub mod lsp;
 pub mod persistence;
 pub mod filesystem;
+pub mod adapters;
 
 // Re-export commonly used types
 pub use lsp::{LazyGraphBuilder, LspClient, LspProcess};
