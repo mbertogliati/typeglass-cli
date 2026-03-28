@@ -2,7 +2,7 @@
 
 This document tracks issues discovered during LSP integration testing and their systematic resolution.
 
-## ✅ Fixed Issues (10)
+## ✅ Fixed Issues (12)
 
 ### LSP-001: rust-analyzer needs indexing time ✅
 - **Problem**: After `initialize`, rust-analyzer returns "file not found" because it's still indexing
@@ -56,11 +56,21 @@ This document tracks issues discovered during LSP integration testing and their 
   - Used real symbols (TypeNode, TypeGraph) instead of mock ones
 - **Status**: ✅ FIXED (all tests adapted to new behavior)
 
-**LSP-003: File URI encoding may be incorrect**
-- **Problem**: `format!("file://{}", path)` may not handle encoding properly
-- **Test**: `test_file_uri_encoding`
-- **Fix**: Use `url` crate for proper encoding
-- **Status**: Open (works for now, but may break on special chars)
+### LSP-003: File URI encoding ✅
+- **Problem**: `format!("file://{}", path)` doesn't handle encoding/special chars properly
+- **Solution**: Use `url` crate's `Url::from_file_path()`
+- **Implementation**: 
+  - Added `url = "2.5"` dependency
+  - Replaced all `format!("file://...")` with `Url::from_file_path()`
+  - Proper URL encoding and correct file:/// prefix (3 slashes)
+  - Applied to initialize() and tests
+- **Status**: ✅ FIXED
+
+---
+
+## 🔴 Open Issues (1)
+
+### 🟡 Major (1)
 
 **LSP-004: Error messages lack actionable context**
 - **Problem**: Errors like "file not found" don't explain which file, why, or what to do
