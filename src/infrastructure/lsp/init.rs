@@ -203,66 +203,82 @@ impl LspClient {
         Ok(())
     }
 
-    /// Send a request and wait for response
+    /// Send a request and wait for response with retry logic
     /// LSP-009 fix: Skip notifications and only return responses
+    /// LSP-006 fix: Retry transient errors with exponential backoff
     async fn send_request(&mut self, method: &str, params: Value) -> Result<Value, LspClientError> {
-        use tokio::time::{timeout, Duration};
+        use tokio::time::{timeout, Duration, sleep};
         
-        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+        let max_retries = 3;
+        let mut attempt = 0;
+        
+        loop {
+            let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
-        let request = JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id,
-            method: method.to_string(),
-            params,
-        };
+            let request = JsonRpcRequest {
+                jsonrpc: "2.0".to_string(),
+                id,
+                method: method.to_string(),
+                params: params.clone(),
+            };
 
-        let request_json = serde_json::to_string(&request)?;
-        self.process.send_message(&request_json).await?;
+            let request_json = serde_json::to_string(&request)?;
+            self.process.send_message(&request_json).await?;
 
-        // LSP-007 fix: Wrap response reading with timeout
-        let response_future = async {
-            // Read messages until we get the response with matching id
-            // Skip any notifications that arrive in between
-            loop {
-                let message_json = self.process.read_message().await?;
-                
-                match LspMessage::parse(&message_json)? {
-                    LspMessage::Response(response) => {
-                        // Check if it's our response
-                        if response.id == id {
-                            // Check for errors
-                            if let Some(error) = response.error {
-                                return Err(LspClientError::InvalidResponse(format!(
-                                    "LSP error: {}",
-                                    error
-                                )));
+            // LSP-007 fix: Wrap response reading with timeout
+            let response_future = async {
+                // Read messages until we get the response with matching id
+                // Skip any notifications that arrive in between
+                loop {
+                    let message_json = self.process.read_message().await?;
+                    
+                    match LspMessage::parse(&message_json)? {
+                        LspMessage::Response(response) => {
+                            // Check if it's our response
+                            if response.id == id {
+                                // Check for errors
+                                if let Some(error) = response.error {
+                                    return Err(LspClientError::InvalidResponse(format!(
+                                        "LSP error: {}",
+                                        error
+                                    )));
+                                }
+
+                                return response
+                                    .result
+                                    .ok_or_else(|| LspClientError::InvalidResponse("No result in response".to_string()));
+                            } else {
+                                // Response for different request, skip
+                                log::debug!("DEBUG: Received response for different request (expected {}, got {})", id, response.id);
+                                continue;
                             }
-
-                            return response
-                                .result
-                                .ok_or_else(|| LspClientError::InvalidResponse("No result in response".to_string()));
-                        } else {
-                            // Response for different request, skip
-                            log::debug!("DEBUG: Received response for different request (expected {}, got {})", id, response.id);
+                        }
+                        LspMessage::Notification(notification) => {
+                            // Log and skip notifications
+                            log::debug!("DEBUG: Received notification: {}", notification.method);
                             continue;
                         }
                     }
-                    LspMessage::Notification(notification) => {
-                        // Log and skip notifications
-                        log::debug!("DEBUG: Received notification: {}", notification.method);
-                        continue;
-                    }
                 }
-            }
-        };
+            };
 
-        // Timeout after 30 seconds
-        match timeout(Duration::from_secs(30), response_future).await {
-            Ok(result) => result,
-            Err(_) => Err(LspClientError::InvalidResponse(format!(
-                "LSP request timed out after 30 seconds (method: {})", method
-            ))),
+            // Timeout after 30 seconds
+            match timeout(Duration::from_secs(30), response_future).await {
+                Ok(Ok(result)) => return Ok(result),
+                Ok(Err(LspClientError::InvalidResponse(msg))) if msg.contains("-32603") && attempt < max_retries => {
+                    // Transient error -32603, retry with exponential backoff
+                    attempt += 1;
+                    let backoff_ms = 100 * (1 << attempt); // 200ms, 400ms, 800ms
+                    log::debug!("DEBUG: Retrying request '{}' (attempt {}/{}) after {}ms due to error -32603", 
+                                method, attempt, max_retries, backoff_ms);
+                    sleep(Duration::from_millis(backoff_ms)).await;
+                    continue;
+                }
+                Ok(Err(e)) => return Err(e),
+                Err(_) => return Err(LspClientError::InvalidResponse(format!(
+                    "LSP request timed out after 30 seconds (method: {})", method
+                ))),
+            }
         }
     }
 
