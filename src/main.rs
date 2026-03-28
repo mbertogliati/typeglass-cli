@@ -6,14 +6,16 @@ use clap::Parser;
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
-
+    // Parse CLI args first
     let args = cli::parse_cli();
     
-    // Set debug mode BEFORE resolve_intent
+    // Configure logging based on --debug flag
     if args.debug {
-        std::env::set_var("TYPEGLASS_DEBUG", "1");
+        std::env::set_var("RUST_LOG", "debug");
+    } else {
+        std::env::set_var("RUST_LOG", "warn");
     }
+    env_logger::init();
     
     let request = match cli::resolve_intent(args) {
         Ok(request) => request,

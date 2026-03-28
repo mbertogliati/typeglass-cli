@@ -1,12 +1,3 @@
-/// Helper macro for debug logging (only prints if TYPEGLASS_DEBUG=1)
-macro_rules! debug_log {
-    ($($arg:tt)*) => {
-        if std::env::var("TYPEGLASS_DEBUG").is_ok() {
-            eprintln!($($arg)*);
-        }
-    };
-}
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -181,7 +172,7 @@ impl LspClient {
     async fn wait_for_indexing(&mut self) -> Result<(), LspClientError> {
         use tokio::time::{sleep, Duration};
 
-        debug_log!("DEBUG: Waiting for LSP to finish indexing...");
+        log::debug!("DEBUG: Waiting for LSP to finish indexing...");
 
         // Poll up to 20 times with 1 second intervals (20 seconds total)
         for attempt in 0..20 {
@@ -194,20 +185,20 @@ impl LspClient {
                 Ok(response) => {
                     // Check if we got a valid array response
                     if let Value::Array(arr) = &response {
-                        debug_log!("DEBUG: Attempt {}: Got {} symbols", attempt, arr.len());
+                        log::debug!("DEBUG: Attempt {}: Got {} symbols", attempt, arr.len());
                         if !arr.is_empty() {
-                            debug_log!("DEBUG: LSP ready!");
+                            log::debug!("DEBUG: LSP ready!");
                             return Ok(());
                         }
                     }
                 }
                 Err(e) => {
-                    debug_log!("DEBUG: Attempt {}: Error: {:?}", attempt, e);
+                    log::debug!("DEBUG: Attempt {}: Error: {:?}", attempt, e);
                 }
             }
         }
 
-        debug_log!("DEBUG: Timeout waiting for LSP, proceeding anyway");
+        log::debug!("DEBUG: Timeout waiting for LSP, proceeding anyway");
         // Proceed anyway if polling fails - better than blocking forever
         Ok(())
     }
@@ -249,13 +240,13 @@ impl LspClient {
                             .ok_or_else(|| LspClientError::InvalidResponse("No result in response".to_string()));
                     } else {
                         // Response for different request, skip
-                        debug_log!("DEBUG: Received response for different request (expected {}, got {})", id, response.id);
+                        log::debug!("DEBUG: Received response for different request (expected {}, got {})", id, response.id);
                         continue;
                     }
                 }
                 LspMessage::Notification(notification) => {
                     // Log and skip notifications
-                    debug_log!("DEBUG: Received notification: {}", notification.method);
+                    log::debug!("DEBUG: Received notification: {}", notification.method);
                     continue;
                 }
             }
@@ -406,7 +397,7 @@ impl LspClient {
             }
         });
 
-        debug_log!("DEBUG: Sending textDocument/references request for {}:{}:{}", file_uri, line, character);
+        log::debug!("DEBUG: Sending textDocument/references request for {}:{}:{}", file_uri, line, character);
 
         let response = self.send_request("textDocument/references", params).await?;
 
@@ -420,7 +411,7 @@ impl LspClient {
             }
         };
 
-        debug_log!("DEBUG: Got {} reference locations", locations.len());
+        log::debug!("DEBUG: Got {} reference locations", locations.len());
         Ok(locations)
     }
 }
