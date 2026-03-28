@@ -144,3 +144,37 @@ pub enum DaemonError {
     #[error("Query failed: {0}")]
     QueryFailed(String),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_daemon_creation() {
+        let daemon = LspDaemon::new(PathBuf::from("/tmp/test"), Language::TypeScript);
+        assert_eq!(daemon.workspace_root, PathBuf::from("/tmp/test"));
+        assert_eq!(daemon.language, Language::TypeScript);
+    }
+
+    #[test]
+    fn test_daemon_clone() {
+        let daemon = LspDaemon::new(PathBuf::from("/tmp/test"), Language::Rust);
+        let cloned = daemon.clone();
+        assert_eq!(cloned.workspace_root, daemon.workspace_root);
+        assert_eq!(cloned.language, daemon.language);
+    }
+
+    #[tokio::test]
+    async fn test_daemon_not_running_initially() {
+        let daemon = LspDaemon::new(PathBuf::from("/tmp/test"), Language::Go);
+        assert!(!daemon.is_running().await);
+    }
+
+    #[tokio::test]
+    async fn test_daemon_stop_when_not_running() {
+        let daemon = LspDaemon::new(PathBuf::from("/tmp/test"), Language::TypeScript);
+        let result = daemon.stop().await;
+        assert!(result.is_ok()); // Should succeed even if not running
+    }
+}

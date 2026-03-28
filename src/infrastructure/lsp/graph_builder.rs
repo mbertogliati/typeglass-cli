@@ -235,15 +235,67 @@ impl LazyGraphBuilder {
 
 #[cfg(test)]
 mod tests {
-    
-
-    // Note: Real tests would require LSP server running
-    // Integration tests will cover the full flow
+    use super::*;
 
     #[test]
-    fn test_lazy_builder_placeholder() {
-        // Placeholder test - full integration test needed
-        assert!(true);
+    fn test_is_type_symbol_identifies_types() {
+        // Based on LSP SymbolKind values
+        assert!(is_type_symbol(5));   // Class
+        assert!(is_type_symbol(11));  // Interface
+        assert!(is_type_symbol(23));  // Struct
+        assert!(!is_type_symbol(6));  // Method
+        assert!(!is_type_symbol(12)); // Function
+        assert!(!is_type_symbol(10)); // Enum (not in matcher currently)
+    }
+
+    #[test]
+    fn test_parse_lsp_location_strips_file_prefix() {
+        let loc = crate::infrastructure::lsp::init::Location {
+            uri: "file:///tmp/test.rs".to_string(),
+            range: crate::infrastructure::lsp::init::Range {
+                start: crate::infrastructure::lsp::init::Position { line: 10, character: 5 },
+                end: crate::infrastructure::lsp::init::Position { line: 10, character: 15 },
+            },
+        };
+        
+        let parsed = parse_lsp_location(&loc).unwrap();
+        assert_eq!(parsed.file_path, PathBuf::from("/tmp/test.rs"));
+        assert_eq!(parsed.line, 10);
+        assert_eq!(parsed.character, 5);
+    }
+
+    #[test]
+    fn test_extract_symbol_from_path_converts_snake_to_pascal() {
+        assert_eq!(
+            extract_symbol_from_path(&PathBuf::from("src/model_graph.rs")),
+            Some("ModelGraph".to_string())
+        );
+        assert_eq!(
+            extract_symbol_from_path(&PathBuf::from("lazy_builder.rs")),
+            Some("LazyBuilder".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_symbol_handles_single_word() {
+        assert_eq!(
+            extract_symbol_from_path(&PathBuf::from("graph.rs")),
+            Some("Graph".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_symbol_handles_multiple_underscores() {
+        assert_eq!(
+            extract_symbol_from_path(&PathBuf::from("my_cool_type_name.rs")),
+            Some("MyCoolTypeName".to_string())
+        );
+    }
+
+    #[test]
+    fn test_graph_builder_error_formats() {
+        let err = GraphBuilderError::InitializationFailed;
+        assert_eq!(err.to_string(), "Failed to initialize LSP");
     }
 }
 

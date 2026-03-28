@@ -127,3 +127,53 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ux_model::intent::{UserCommandContext, UserWorkspace, UserGoalType, UserGoal, UserPromiseType, UserPromise};
+
+    #[test]
+    fn test_user_result_status() {
+        assert_eq!(UserResultStatus::Success, UserResultStatus::Success);
+        assert_ne!(UserResultStatus::Success, UserResultStatus::Failure);
+    }
+
+    #[test]
+    fn test_user_summary() {
+        let summary = UserSummary("test summary".to_string());
+        assert_eq!(summary.0, "test summary");
+    }
+
+    #[test]
+    fn test_user_limitation() {
+        let lim = UserLimitation("limited".to_string());
+        assert_eq!(lim.0, "limited");
+    }
+
+    #[test]
+    fn test_user_next_step() {
+        let step = UserNextStep("do this".to_string());
+        assert_eq!(step.0, "do this");
+    }
+
+    #[test]
+    fn test_user_result_context() {
+        let ctx = UserResultContext {
+            command_context: UserCommandContext {
+                user_workspace: UserWorkspace::Pwd,
+            },
+        };
+        assert_eq!(ctx.command_context.user_workspace, UserWorkspace::Pwd);
+    }
+
+    #[test]
+    fn test_user_workspace_context() {
+        let ws_ctx = UserWorkspaceContext {
+            used_path: PathBuf::from("/tmp"),
+            override_path: None,
+        };
+        assert_eq!(ws_ctx.used_path, PathBuf::from("/tmp"));
+        assert!(ws_ctx.override_path.is_none());
+    }
+}

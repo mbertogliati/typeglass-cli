@@ -175,3 +175,103 @@ pub fn promises_for_generic_error() -> Vec<UserPromise> {
     .map(UserPromise)
     .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_user_mode_variants() {
+        assert_eq!(UserMode::Terminal, UserMode::Terminal);
+        assert_ne!(UserMode::Terminal, UserMode::Interactive);
+    }
+
+    #[test]
+    fn test_user_promise_creation() {
+        let promise = UserPromise(UserPromiseType::FastByDefault);
+        assert_eq!(promise.0, UserPromiseType::FastByDefault);
+    }
+
+    #[test]
+    fn test_user_goal_from() {
+        let goal: UserGoal = UserGoalType::UnderstandCodebaseDomain.into();
+        assert_eq!(goal.0, UserGoalType::UnderstandCodebaseDomain);
+    }
+
+    #[test]
+    fn test_user_workspace_explicit() {
+        let ws = UserWorkspace::Explicit(PathBuf::from("/tmp/test"));
+        assert_eq!(ws, UserWorkspace::Explicit(PathBuf::from("/tmp/test")));
+    }
+
+    #[test]
+    fn test_user_command_context() {
+        let ctx = UserCommandContext {
+            user_workspace: UserWorkspace::Pwd,
+        };
+        assert_eq!(ctx.user_workspace, UserWorkspace::Pwd);
+    }
+
+    #[test]
+    fn test_user_command_from_symbol() {
+        let cmd = UserCommandFrom::symbol("MyType".to_string(), Some(3));
+        assert_eq!(cmd.target, FromTarget::Symbol("MyType".to_string()));
+        assert_eq!(cmd.depth, Some(3));
+    }
+
+    #[test]
+    fn test_user_command_from_file() {
+        let cmd = UserCommandFrom::file(PathBuf::from("test.ts"), None);
+        assert_eq!(cmd.target, FromTarget::File(PathBuf::from("test.ts")));
+        assert_eq!(cmd.depth, None);
+    }
+
+    #[test]
+    fn test_user_command_from_module() {
+        let cmd = UserCommandFrom::module(PathBuf::from("src/"), Some(2));
+        assert!(matches!(cmd.target, FromTarget::Module(_)));
+    }
+
+    #[test]
+    fn test_user_command_from_public_exports() {
+        let cmd = UserCommandFrom::public_exports(Some(5));
+        assert_eq!(cmd.target, FromTarget::PublicExports);
+    }
+
+    #[test]
+    fn test_user_request_terminal() {
+        let ctx = UserCommandContext { user_workspace: UserWorkspace::Pwd };
+        let cmd = UserCommandFrom::symbol("Test".to_string(), None);
+        let req = UserRequest::terminal(cmd.clone(), ctx.clone());
+        
+        assert_eq!(req.mode(), UserMode::Terminal);
+        assert_eq!(req.command(), &cmd);
+        assert_eq!(req.context(), &ctx);
+    }
+
+    #[test]
+    fn test_user_request_interactive() {
+        let ctx = UserCommandContext { user_workspace: UserWorkspace::Pwd };
+        let cmd = UserCommandGc;
+        let req = UserRequest::interactive(cmd, ctx);
+        
+        assert_eq!(req.mode(), UserMode::Interactive);
+    }
+
+    #[test]
+    fn test_user_request_into_parts() {
+        let ctx = UserCommandContext { user_workspace: UserWorkspace::Pwd };
+        let cmd = UserCommandDoctor;
+        let req = UserRequest::terminal(cmd, ctx.clone());
+        
+        let (extracted_cmd, extracted_ctx) = req.into_parts();
+        assert_eq!(extracted_ctx.user_workspace, ctx.user_workspace);
+    }
+
+    #[test]
+    fn test_promises_for_generic_error() {
+        let promises = promises_for_generic_error();
+        assert_eq!(promises.len(), 3);
+        assert!(promises.iter().any(|p| matches!(p.0, UserPromiseType::ErrorsAreActionable)));
+    }
+}

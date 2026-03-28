@@ -255,3 +255,44 @@ impl ClockPort for ClockAdapter {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_wired_adapters_creation() {
+        let adapters = WiredAdapters::new(PathBuf::from("/tmp/test"), Language::TypeScript);
+        // Just check it doesn't panic
+        assert!(true);
+    }
+
+    #[test]
+    fn test_lsp_adapter_creation() {
+        let adapter = LspAdapter::new(PathBuf::from("/tmp/test"), Language::Rust);
+        // Verify it's clonable
+        let _cloned = adapter.clone();
+        assert!(true);
+    }
+
+    #[tokio::test]
+    async fn test_clock_adapter_now() {
+        let clock = ClockAdapter;
+        let result = clock.now().await;
+        assert!(result.is_ok());
+        let tick = result.unwrap();
+        assert!(tick.unix_time_ms > 0);
+    }
+
+    #[tokio::test]
+    async fn test_clock_adapter_sleep() {
+        let clock = ClockAdapter;
+        let start = std::time::Instant::now();
+        let result = clock.sleep(Duration::from_millis(10)).await;
+        let elapsed = start.elapsed();
+        
+        assert!(result.is_ok());
+        assert!(elapsed >= Duration::from_millis(10));
+    }
+}

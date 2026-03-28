@@ -234,3 +234,114 @@ impl ServerInfo {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lsp_initialize_params_new() {
+        let params = LspInitializeParams::new("file:///tmp".to_string());
+        assert_eq!(params.root_uri, Some("file:///tmp".to_string()));
+        assert!(params.process_id.is_none());
+    }
+
+    #[test]
+    fn test_lsp_initialize_params_with_process_id() {
+        let params = LspInitializeParams::new("file:///tmp".to_string())
+            .with_process_id(1234);
+        assert_eq!(params.process_id, Some(1234));
+    }
+
+    #[test]
+    fn test_client_capabilities_full() {
+        let caps = ClientCapabilities::full();
+        assert!(caps.text_document.is_some());
+        assert!(caps.workspace.is_some());
+    }
+
+    #[test]
+    fn test_client_capabilities_minimal() {
+        let caps = ClientCapabilities::minimal();
+        assert!(caps.text_document.is_some());
+        assert!(caps.workspace.is_none());
+    }
+
+    #[test]
+    fn test_text_document_capabilities_full() {
+        let caps = TextDocumentCapabilities::full();
+        assert!(caps.definition);
+        assert!(caps.type_definition);
+        assert!(caps.hover);
+        assert!(caps.completion);
+        assert!(caps.references);
+    }
+
+    #[test]
+    fn test_text_document_capabilities_minimal() {
+        let caps = TextDocumentCapabilities::minimal();
+        assert!(caps.definition);
+        assert!(!caps.type_definition);
+        assert!(caps.hover);
+        assert!(!caps.completion);
+    }
+
+    #[test]
+    fn test_workspace_capabilities_full() {
+        let caps = WorkspaceCapabilities::full();
+        assert!(caps.workspace_folders);
+        assert!(caps.configuration);
+    }
+
+    #[test]
+    fn test_server_capabilities_to_lsp() {
+        let caps = ServerCapabilities {
+            text_document_sync: None,
+            definition_provider: true,
+            type_definition_provider: false,
+            hover_provider: true,
+            implementation_provider: false,
+            references_provider: true,
+            document_symbol_provider: false,
+        };
+        
+        let lsp_caps = caps.to_lsp_capabilities();
+        assert!(lsp_caps.supports_definition);
+        assert!(lsp_caps.supports_hover);
+        assert!(lsp_caps.supports_references);
+        assert!(!lsp_caps.supports_document_symbols);
+    }
+
+    #[test]
+    fn test_initialize_result() {
+        let caps = ServerCapabilities {
+            text_document_sync: None,
+            definition_provider: true,
+            type_definition_provider: true,
+            hover_provider: true,
+            implementation_provider: true,
+            references_provider: true,
+            document_symbol_provider: true,
+        };
+        
+        let result = InitializeResult { 
+            capabilities: caps.clone(),
+            server_info: None,
+        };
+        assert_eq!(result.capabilities, caps);
+    }
+
+    #[test]
+    fn test_server_info_builder() {
+        let info = ServerInfo::new("rust-analyzer".to_string())
+            .with_version("0.1.0".to_string());
+        assert_eq!(info.name, "rust-analyzer");
+        assert_eq!(info.version, Some("0.1.0".to_string()));
+    }
+
+    #[test]
+    fn test_text_document_sync_kind_default() {
+        let kind = TextDocumentSyncKind::default();
+        assert_eq!(kind, TextDocumentSyncKind::Full);
+    }
+}

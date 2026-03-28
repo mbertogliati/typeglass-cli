@@ -51,6 +51,20 @@ pub struct LspQueryResponse {
     pub capabilities: Option<LspCapabilities>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lsp_query_response_with_graph() {
+        let resp = LspQueryResponse {
+            graph: None,
+            capabilities: None,
+        };
+        assert!(resp.graph.is_none());
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockTick {
     pub unix_time_ms: u128,
