@@ -2,7 +2,7 @@
 
 This document tracks issues discovered during LSP integration testing and their systematic resolution.
 
-## ✅ Fixed Issues (12)
+## ✅ Fixed Issues (13)
 
 ### LSP-001: rust-analyzer needs indexing time ✅
 - **Problem**: After `initialize`, rust-analyzer returns "file not found" because it's still indexing
