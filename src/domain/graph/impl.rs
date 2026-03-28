@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use super::types::{
+use crate::domain::graph::{
     GeneratedFilePattern, GeneratedFilePatternError, GraphCompleteness, GraphIntegrityError,
-    GraphStatistics, GraphWarning, SourceLocation, SourceLocationError, SymbolName,
+    GraphStatistics, GraphWarning, SourceLocation, SourceLocationError, SymbolKind, SymbolName,
     SymbolNameError, TraversalPolicy, TraversalPolicyError, TypeEdge, TypeGraph, TypeNode,
     UnresolvedReferenceCount,
 };
@@ -89,6 +89,42 @@ impl TypeGraph {
             }
         }
         Ok(())
+    }
+
+    // From impl_traversal.rs - graph mutation and query methods
+    /// Add a node to the graph
+    pub fn add_node(&mut self, node: TypeNode) {
+        self.nodes.insert(node.name.clone(), node);
+    }
+
+    /// Add an edge to the graph
+    pub fn add_edge(&mut self, edge: TypeEdge) {
+        self.edges.push(edge);
+    }
+
+    /// Get node by symbol name
+    pub fn get_node(&self, symbol: &SymbolName) -> Option<&TypeNode> {
+        self.nodes.get(symbol)
+    }
+
+    /// Get all edges from a symbol
+    pub fn edges_from(&self, symbol: &SymbolName) -> Vec<&TypeEdge> {
+        self.edges.iter().filter(|e| &e.from == symbol).collect()
+    }
+
+    /// Get all edges to a symbol
+    pub fn edges_to(&self, symbol: &SymbolName) -> Vec<&TypeEdge> {
+        self.edges.iter().filter(|e| &e.to == symbol).collect()
+    }
+
+    /// Check if graph is complete
+    pub fn is_complete(&self) -> bool {
+        matches!(self.completeness, GraphCompleteness::Complete)
+    }
+
+    /// Find all symbols of a specific kind
+    pub fn symbols_by_kind(&self, kind: SymbolKind) -> Vec<&TypeNode> {
+        self.nodes.values().filter(|n| n.kind == kind).collect()
     }
 }
 
