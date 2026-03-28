@@ -6,7 +6,7 @@ use crate::domain::graph::{
     SymbolOrigin, TraversalDirection, TypeEdge, TypeGraph, TypeNode,
 };
 use crate::domain::language::{Language, LspServerConfig};
-use crate::infrastructure::{LspClient, LspClientError, Location, SymbolFinder, SymbolFinderError};
+use crate::infrastructure::{LspClient, LspClientError, Location, SymbolFinderError};
 
 /// Lazy graph builder - builds TypeGraph incrementally via LSP queries
 pub struct LazyGraphBuilder {
@@ -53,9 +53,35 @@ impl LazyGraphBuilder {
         direction: TraversalDirection,
         max_depth: u8,
     ) -> Result<TypeGraph, GraphBuilderError> {
-        // Find entry point
-        let finder = SymbolFinder::new(self.workspace_root.clone());
-        let entry_location = finder.find_symbol(symbol_name)?;
+        // LSP-002 fix: Use workspace/symbol instead of grep
+        // This properly finds symbol definitions, not just any occurrence
+        let symbols = self.lsp_client.workspace_symbols(symbol_name).await?;
+        
+        eprintln!("DEBUG: Found {} symbols for '{}'", symbols.len(), symbol_name);
+        for (i, sym) in symbols.iter().enumerate() {
+            eprintln!("  [{}] {} (kind: {}) at {}", i, sym.name, sym.kind, sym.location.uri);
+        }
+        
+        if symbols.is_empty() {
+            return Err(GraphBuilderError::FinderError(SymbolFinderError::NotFound {
+                symbol: symbol_name.to_string(),
+            }));
+        }
+
+        // Find the best match (exact name match, prefer struct/class/interface)
+        let entry_symbol = symbols
+            .iter()
+            .find(|s| s.name == symbol_name && is_type_symbol(s.kind))
+            .or_else(|| symbols.first())
+            .ok_or_else(|| GraphBuilderError::FinderError(SymbolFinderError::NotFound {
+                symbol: symbol_name.to_string(),
+            }))?;
+
+        eprintln!("DEBUG: Selected symbol: {} at {}", entry_symbol.name, entry_symbol.location.uri);
+
+        let entry_location = parse_lsp_location(&entry_symbol.location)?;
+
+        eprintln!("DEBUG: Parsed location: {:?}", entry_location.file_path);
 
         // Build graph incrementally
         let mut graph = TypeGraph::empty();
@@ -63,20 +89,22 @@ impl LazyGraphBuilder {
         let mut queue = VecDeque::new();
 
         // Start with entry symbol
-        let entry_symbol = SymbolName(symbol_name.to_string());
-        queue.push_back((entry_symbol.clone(), entry_location.clone(), 0));
-        visited.insert(entry_symbol.clone());
+        let entry_sym = SymbolName(symbol_name.to_string());
+        queue.push_back((entry_sym.clone(), entry_location.clone(), 0));
+        visited.insert(entry_sym.clone());
 
         while let Some((symbol, location, depth)) = queue.pop_front() {
             if depth >= max_depth {
                 continue;
             }
 
-            // Query definition
-            let file_uri = format!("file://{}", location.file_path.display());
+            // Query definition - use original URI from LSP!
+            let file_uri = &entry_symbol.location.uri;
+            eprintln!("DEBUG: Querying definition at {}", file_uri);
+            
             let definitions = self
                 .lsp_client
-                .query_definition(&file_uri, location.line, location.character)
+                .query_definition(file_uri, location.line, location.character)
                 .await?;
 
             // Add node for current symbol
@@ -151,4 +179,32 @@ mod tests {
         // Placeholder test - full integration test needed
         assert!(true);
     }
+}
+
+/// Helper: Check if symbol kind represents a type definition
+fn is_type_symbol(kind: u32) -> bool {
+    // LSP SymbolKind enum values
+    // 5 = Class, 6 = Method, 10 = Function, 12 = Variable, 23 = Struct, 11 = Interface
+    matches!(kind, 5 | 11 | 23) // Class, Interface, Struct
+}
+
+/// Helper structure for symbol location
+#[derive(Debug, Clone)]
+struct InternalSymbolLocation {
+    file_path: PathBuf,
+    line: u32,
+    character: u32,
+}
+
+/// Helper: Parse LSP Location to internal location
+fn parse_lsp_location(loc: &crate::infrastructure::lsp::init::Location) -> Result<InternalSymbolLocation, GraphBuilderError> {
+    // Remove file:// prefix and parse path
+    let path_str = loc.uri.strip_prefix("file://").unwrap_or(&loc.uri);
+    let file_path = PathBuf::from(path_str);
+    
+    Ok(InternalSymbolLocation {
+        file_path,
+        line: loc.range.start.line,
+        character: loc.range.start.character,
+    })
 }

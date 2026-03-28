@@ -137,19 +137,33 @@ impl LspClient {
     async fn wait_for_indexing(&mut self) -> Result<(), LspClientError> {
         use tokio::time::{sleep, Duration};
 
-        // Poll up to 10 times with 500ms intervals (5 seconds total)
-        for attempt in 0..10 {
+        eprintln!("DEBUG: Waiting for LSP to finish indexing...");
+
+        // Poll up to 20 times with 1 second intervals (20 seconds total)
+        for attempt in 0..20 {
             if attempt > 0 {
-                sleep(Duration::from_millis(500)).await;
+                sleep(Duration::from_secs(1)).await;
             }
 
-            // Try workspace/symbol query (lightweight check)
+            // Try workspace/symbol query with a simple query
             match self.send_request("workspace/symbol", serde_json::json!({"query": ""})).await {
-                Ok(_) => return Ok(()), // Server responded, it's ready
-                Err(_) => continue, // Try again
+                Ok(response) => {
+                    // Check if we got a valid array response
+                    if let Value::Array(arr) = &response {
+                        eprintln!("DEBUG: Attempt {}: Got {} symbols", attempt, arr.len());
+                        if !arr.is_empty() {
+                            eprintln!("DEBUG: LSP ready!");
+                            return Ok(());
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("DEBUG: Attempt {}: Error: {:?}", attempt, e);
+                }
             }
         }
 
+        eprintln!("DEBUG: Timeout waiting for LSP, proceeding anyway");
         // Proceed anyway if polling fails - better than blocking forever
         Ok(())
     }
@@ -273,6 +287,35 @@ impl LspClient {
 
         Ok(locations)
     }
+
+    /// Query workspace symbols (LSP-002 fix)
+    /// This is the proper way to find symbol definitions, not grep
+    pub async fn workspace_symbols(
+        &mut self,
+        query: &str,
+    ) -> Result<Vec<SymbolInformation>, LspClientError> {
+        if !self.initialized {
+            return Err(LspClientError::NotInitialized);
+        }
+
+        let params = serde_json::json!({
+            "query": query
+        });
+
+        let response = self.send_request("workspace/symbol", params).await?;
+
+        let symbols: Vec<SymbolInformation> = match response {
+            Value::Array(arr) => serde_json::from_value(Value::Array(arr))?,
+            Value::Null => vec![],
+            _ => {
+                return Err(LspClientError::InvalidResponse(
+                    "Unexpected workspace/symbol response format".to_string(),
+                ))
+            }
+        };
+
+        Ok(symbols)
+    }
 }
 
 /// LSP Location type
@@ -294,6 +337,16 @@ pub struct Range {
 pub struct Position {
     pub line: u32,
     pub character: u32,
+}
+
+/// LSP SymbolInformation type (for workspace/symbol)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolInformation {
+    pub name: String,
+    pub kind: u32, // SymbolKind enum as number
+    pub location: Location,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub container_name: Option<String>,
 }
 
 impl Drop for LspClient {
