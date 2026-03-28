@@ -186,31 +186,17 @@ impl LspPort for LspAdapter {
         let daemon = self.daemon.clone();
 
         Box::pin(async move {
-            // Get LSP client from daemon (creates if needed, reuses if exists)
-            let lsp_client_arc = daemon.get_lsp_client().await
-                .map_err(|e| LspPortError::QueryFailed {
-                    source: crate::domain::lsp::LspError::WorkspaceError {
-                        message: format!("Failed to get LSP client from daemon: {}", e),
-                    },
-                })?;
-            
-            // Lock the client and execute query
-            let mut guard = lsp_client_arc.lock().await;
-            let builder = guard.as_mut().ok_or_else(|| LspPortError::QueryFailed {
-                source: crate::domain::lsp::LspError::WorkspaceError {
-                    message: "LSP client not initialized".to_string(),
-                },
-            })?;
-
             // Execute query based on type
             let graph = match &request.query {
                 crate::domain::lsp::LspQuery::FromSymbol { symbol, depth } => {
                     let direction = crate::domain::graph::TraversalDirection::Both;
-                    builder.build_from_symbol(symbol, direction, depth.get())
+                    
+                    // Use daemon's query_symbol which has cache integration
+                    daemon.query_symbol(symbol, depth.get(), direction)
                         .await
                         .map_err(|e| LspPortError::QueryFailed {
                             source: crate::domain::lsp::LspError::WorkspaceError {
-                                message: format!("Failed to build graph: {}", e),
+                                message: format!("Daemon query failed: {}", e),
                             },
                         })?
                 },
@@ -222,8 +208,6 @@ impl LspPort for LspAdapter {
                     });
                 }
             };
-
-            // Note: DON'T shutdown the builder - it's persistent in the daemon!
 
             Ok(LspQueryResponse {
                 graph: Some(graph),

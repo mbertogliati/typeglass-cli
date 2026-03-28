@@ -7,7 +7,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::domain::language::Language;
-use crate::infrastructure::LazyGraphBuilder;
+use crate::domain::graph::{TypeGraph, TraversalDirection};
+use crate::infrastructure::{LazyGraphBuilder, GraphCache};
 
 /// Persistent LSP daemon that reuses connections across CLI invocations
 pub struct LspDaemon {
@@ -16,16 +17,65 @@ pub struct LspDaemon {
     /// LSP client that stays alive between queries
     /// Wrapped in Mutex for interior mutability
     lsp_client: Arc<Mutex<Option<LazyGraphBuilder>>>,
+    /// Shared cache for graph results
+    cache: Arc<Mutex<GraphCache>>,
 }
 
 impl LspDaemon {
     /// Create a new daemon (doesn't start LSP yet - lazy init)
     pub fn new(workspace_root: PathBuf, language: Language) -> Self {
+        let cache = GraphCache::new().unwrap_or_else(|e| {
+            log::warn!("Failed to initialize cache: {}, caching disabled", e);
+            // Return a dummy cache that will fail operations gracefully
+            GraphCache::new().unwrap()
+        });
+        
         Self {
             workspace_root,
             language,
             lsp_client: Arc::new(Mutex::new(None)),
+            cache: Arc::new(Mutex::new(cache)),
         }
+    }
+
+    /// Query with cache support
+    pub async fn query_symbol(
+        &self,
+        symbol: &str,
+        depth: u8,
+        direction: TraversalDirection,
+    ) -> Result<TypeGraph, DaemonError> {
+        // 1. Check cache first
+        {
+            let cache = self.cache.lock().await;
+            if let Ok(graph) = cache.get(symbol, depth as usize, direction) {
+                log::debug!("Cache HIT for symbol '{}' (depth {})", symbol, depth);
+                return Ok(graph);
+            }
+            log::debug!("Cache MISS for symbol '{}' (depth {})", symbol, depth);
+        }
+
+        // 2. Cache miss - query LSP
+        let lsp_client_arc = self.get_lsp_client().await?;
+        let mut guard = lsp_client_arc.lock().await;
+        let builder = guard.as_mut()
+            .ok_or(DaemonError::NotRunning)?;
+
+        let graph = builder.build_from_symbol(symbol, direction, depth)
+            .await
+            .map_err(|e| DaemonError::QueryFailed(e.to_string()))?;
+
+        // 3. Write to cache
+        {
+            let cache = self.cache.lock().await;
+            if let Err(e) = cache.set(symbol, depth as usize, direction, &graph) {
+                log::warn!("Failed to write cache: {}", e);
+            } else {
+                log::debug!("Cache WRITE for symbol '{}' (depth {})", symbol, depth);
+            }
+        }
+
+        Ok(graph)
     }
 
     /// Get or create the LSP client (lazy initialization)
@@ -75,6 +125,7 @@ impl Clone for LspDaemon {
             workspace_root: self.workspace_root.clone(),
             language: self.language,
             lsp_client: self.lsp_client.clone(), // Arc clone (cheap)
+            cache: self.cache.clone(), // Arc clone (cheap)
         }
     }
 }
@@ -89,4 +140,7 @@ pub enum DaemonError {
     
     #[error("LSP client is not running")]
     NotRunning,
+    
+    #[error("Query failed: {0}")]
+    QueryFailed(String),
 }
