@@ -138,6 +138,50 @@ mod tests {
         assert_eq!(UserResultStatus::Success, UserResultStatus::Success);
         assert_ne!(UserResultStatus::Success, UserResultStatus::Failure);
     }
+    
+    #[test]
+    fn test_user_summary_creation() {
+        let summary = UserSummary("Test summary".to_string());
+        assert_eq!(summary.0, "Test summary");
+    }
+    
+    #[test]
+    fn test_user_limitation_creation() {
+        let lim = UserLimitation("Cannot do X".to_string());
+        assert_eq!(lim.0, "Cannot do X");
+    }
+    
+    #[test]
+    fn test_user_next_step_creation() {
+        let step = UserNextStep("Run command Y".to_string());
+        assert_eq!(step.0, "Run command Y");
+    }
+    
+    #[test]
+    fn test_user_result_status_variants() {
+        assert_ne!(UserResultStatus::Success, UserResultStatus::Partial);
+        assert_ne!(UserResultStatus::Partial, UserResultStatus::Failure);
+    }
+    
+    #[test]
+    fn test_user_workspace_context() {
+        let ctx = UserWorkspaceContext {
+            used_path: PathBuf::from("/workspace"),
+            override_path: None,
+        };
+        assert_eq!(ctx.used_path, PathBuf::from("/workspace"));
+        assert!(ctx.override_path.is_none());
+    }
+    
+    #[test]
+    fn test_user_workspace_context_with_override() {
+        let ctx = UserWorkspaceContext {
+            used_path: PathBuf::from("/workspace"),
+            override_path: Some(PathBuf::from("/override")),
+        };
+        assert_eq!(ctx.used_path, PathBuf::from("/workspace"));
+        assert_eq!(ctx.override_path, Some(PathBuf::from("/override")));
+    }
 
     #[test]
     fn test_user_summary() {
@@ -168,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn test_user_workspace_context() {
+    fn test_user_workspace_context_alt() {
         let ws_ctx = UserWorkspaceContext {
             used_path: PathBuf::from("/tmp"),
             override_path: None,

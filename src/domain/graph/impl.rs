@@ -128,6 +128,208 @@ impl TypeGraph {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    
+    // Helper to create a minimal TypeNode for testing
+    fn test_node(name: &str) -> TypeNode {
+        TypeNode {
+            id: crate::domain::graph::QualifiedSymbolName {
+                symbol: SymbolName::new(name.to_string()).unwrap(),
+                module_path: PathBuf::from("/test/file.rs"),
+            },
+            name: SymbolName::new(name.to_string()).unwrap(),
+            kind: SymbolKind::Struct,
+            origin: crate::domain::graph::SymbolOrigin::Canonical,
+            location: SourceLocation::new(PathBuf::from("/test/file.rs"), 1, 1).unwrap(),
+            language: crate::domain::language::Language::Rust,
+            generic_parameters: Vec::new(),
+        }
+    }
+    
+    #[test]
+    fn test_symbol_name_new_valid() {
+        let name = SymbolName::new("MyType".to_string()).unwrap();
+        assert_eq!(name.as_str(), "MyType");
+    }
+    
+    #[test]
+    fn test_symbol_name_new_empty() {
+        assert!(matches!(
+            SymbolName::new("".to_string()),
+            Err(SymbolNameError::Empty)
+        ));
+        assert!(matches!(
+            SymbolName::new("   ".to_string()),
+            Err(SymbolNameError::Empty)
+        ));
+    }
+    
+    #[test]
+    fn test_source_location_new_valid() {
+        let loc = SourceLocation::new(PathBuf::from("/test.rs"), 10, 5).unwrap();
+        assert_eq!(loc.line, 10);
+        assert_eq!(loc.column, 5);
+        assert_eq!(loc.file, PathBuf::from("/test.rs"));
+    }
+    
+    #[test]
+    fn test_source_location_invalid_line() {
+        assert!(matches!(
+            SourceLocation::new(PathBuf::from("/test.rs"), 0, 5),
+            Err(SourceLocationError::InvalidLine)
+        ));
+    }
+    
+    #[test]
+    fn test_source_location_invalid_column() {
+        assert!(matches!(
+            SourceLocation::new(PathBuf::from("/test.rs"), 1, 0),
+            Err(SourceLocationError::InvalidColumn)
+        ));
+    }
+    
+    #[test]
+    fn test_type_graph_empty() {
+        let graph = TypeGraph::empty();
+        assert_eq!(graph.nodes().len(), 0);
+        assert_eq!(graph.edges().len(), 0);
+        assert_eq!(graph.warnings().len(), 0);
+        assert_eq!(*graph.completeness(), GraphCompleteness::Complete);
+    }
+    
+    #[test]
+    fn test_type_graph_add_node() {
+        let mut graph = TypeGraph::empty();
+        let node = test_node("TypeA");
+        graph.add_node(node.clone());
+        
+        assert_eq!(graph.nodes().len(), 1);
+        assert!(graph.get_node(&SymbolName::new("TypeA".to_string()).unwrap()).is_some());
+    }
+    
+    #[test]
+    fn test_type_graph_get_node() {
+        let mut graph = TypeGraph::empty();
+        let node = test_node("TypeA");
+        graph.add_node(node);
+        
+        let found = graph.get_node(&SymbolName::new("TypeA".to_string()).unwrap());
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name.as_str(), "TypeA");
+    }
+    
+    #[test]
+    fn test_type_graph_statistics_empty() {
+        let graph = TypeGraph::empty();
+        let stats = graph.statistics();
+        assert_eq!(stats.node_count, 0);
+        assert_eq!(stats.edge_count, 0);
+        assert_eq!(stats.warning_count, 0);
+        assert_eq!(stats.unresolved_references.value, 0);
+    }
+    
+    #[test]
+    fn test_type_graph_statistics_with_data() {
+        let mut graph = TypeGraph::empty();
+        graph.add_node(test_node("TypeA"));
+        graph.add_node(test_node("TypeB"));
+        
+        let stats = graph.statistics();
+        assert_eq!(stats.node_count, 2);
+        assert_eq!(stats.edge_count, 0);
+    }
+    
+    #[test]
+    fn test_type_graph_validate_integrity_empty() {
+        let graph = TypeGraph::empty();
+        assert!(graph.validate_integrity().is_ok());
+    }
+    
+    #[test]
+    fn test_type_graph_is_complete() {
+        let graph = TypeGraph::empty();
+        assert!(graph.is_complete());
+    }
+    
+    #[test]
+    fn test_type_graph_add_edge() {
+        let mut graph = TypeGraph::empty();
+        graph.add_node(test_node("TypeA"));
+        graph.add_node(test_node("TypeB"));
+        
+        let edge = TypeEdge {
+            from: SymbolName::new("TypeA".to_string()).unwrap(),
+            to: SymbolName::new("TypeB".to_string()).unwrap(),
+            kind: crate::domain::graph::EdgeKind::Contains,
+        };
+        graph.add_edge(edge);
+        
+        assert_eq!(graph.edges().len(), 1);
+    }
+    
+    #[test]
+    fn test_type_graph_edges_from() {
+        let mut graph = TypeGraph::empty();
+        graph.add_node(test_node("TypeA"));
+        graph.add_node(test_node("TypeB"));
+        graph.add_node(test_node("TypeC"));
+        
+        let edge1 = TypeEdge {
+            from: SymbolName::new("TypeA".to_string()).unwrap(),
+            to: SymbolName::new("TypeB".to_string()).unwrap(),
+            kind: crate::domain::graph::EdgeKind::Contains,
+        };
+        let edge2 = TypeEdge {
+            from: SymbolName::new("TypeA".to_string()).unwrap(),
+            to: SymbolName::new("TypeC".to_string()).unwrap(),
+            kind: crate::domain::graph::EdgeKind::Extends,
+        };
+        graph.add_edge(edge1);
+        graph.add_edge(edge2);
+        
+        let edges = graph.edges_from(&SymbolName::new("TypeA".to_string()).unwrap());
+        assert_eq!(edges.len(), 2);
+    }
+    
+    #[test]
+    fn test_type_graph_edges_to() {
+        let mut graph = TypeGraph::empty();
+        graph.add_node(test_node("TypeA"));
+        graph.add_node(test_node("TypeB"));
+        
+        let edge = TypeEdge {
+            from: SymbolName::new("TypeA".to_string()).unwrap(),
+            to: SymbolName::new("TypeB".to_string()).unwrap(),
+            kind: crate::domain::graph::EdgeKind::Contains,
+        };
+        graph.add_edge(edge);
+        
+        let edges = graph.edges_to(&SymbolName::new("TypeB".to_string()).unwrap());
+        assert_eq!(edges.len(), 1);
+    }
+    
+    #[test]
+    fn test_type_graph_symbols_by_kind() {
+        let mut graph = TypeGraph::empty();
+        let mut node_struct = test_node("TypeA");
+        node_struct.kind = SymbolKind::Struct;
+        graph.add_node(node_struct);
+        
+        let mut node_enum = test_node("TypeB");
+        node_enum.kind = SymbolKind::Enum;
+        graph.add_node(node_enum);
+        
+        let structs = graph.symbols_by_kind(SymbolKind::Struct);
+        assert_eq!(structs.len(), 1);
+        
+        let enums = graph.symbols_by_kind(SymbolKind::Enum);
+        assert_eq!(enums.len(), 1);
+    }
+}
+
 impl GeneratedFilePattern {
     pub fn new(glob: String) -> Result<Self, GeneratedFilePatternError> {
         if glob.trim().is_empty() {
@@ -149,5 +351,28 @@ impl TraversalPolicy {
             return Err(TraversalPolicyError::ZeroEdges);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod policy_tests {
+    use super::*;
+    
+    #[test]
+    fn test_generated_file_pattern_valid() {
+        let pattern = GeneratedFilePattern::new("*.generated.ts".to_string()).unwrap();
+        assert_eq!(pattern.glob, "*.generated.ts");
+    }
+    
+    #[test]
+    fn test_generated_file_pattern_empty() {
+        assert!(matches!(
+            GeneratedFilePattern::new("".to_string()),
+            Err(GeneratedFilePatternError::Empty)
+        ));
+        assert!(matches!(
+            GeneratedFilePattern::new("  ".to_string()),
+            Err(GeneratedFilePatternError::Empty)
+        ));
     }
 }
