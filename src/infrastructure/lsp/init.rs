@@ -547,12 +547,3 @@ mod tests {
         }
     }
 }
-
-/// Helper macro for debug logging (only prints if TYPEGLASS_DEBUG=1)
-macro_rules! debug_log {
-    ($($arg:tt)*) => {
-        if std::env::var("TYPEGLASS_DEBUG").is_ok() {
-            eprintln!($($arg)*);
-        }
-    };
-}
