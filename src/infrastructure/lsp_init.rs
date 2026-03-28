@@ -269,7 +269,6 @@ pub struct Position {
     pub line: u32,
     pub character: u32,
 }
-}
 
 impl Drop for LspClient {
     fn drop(&mut self) {

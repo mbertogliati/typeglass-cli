@@ -1225,6 +1225,7 @@ dependencies = [
  "env_logger",
  "log",
  "predicates",
+ "regex",
  "sealed",
  "serde",
  "serde_json",
