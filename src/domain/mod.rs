@@ -11,3 +11,8 @@ pub mod recovery;
 pub mod session;
 pub mod telemetry;
 pub mod workspace;
+
+#[cfg(test)]
+mod tests_performance;
+#[cfg(test)]
+mod tests_recovery;
