@@ -101,11 +101,15 @@ This document tracks issues discovered during LSP integration testing and their 
 
 ### 🔵 Minor (2)
 
-**LSP-006: No retry logic for transient failures**
+### LSP-006: Retry logic for transient failures ✅
 - **Problem**: Immediate failure on error -32603, could be transient
-- **Test**: `test_lsp_retry_on_transient_errors`
-- **Fix**: Exponential backoff for specific error codes
-- **Status**: Open (nice to have)
+- **Solution**: Exponential backoff retry for transient errors
+- **Implementation**: 
+  - Retry up to 3 times on error code -32603
+  - Exponential backoff: 200ms, 400ms, 800ms
+  - All other errors fail immediately (no retry)
+  - Debug logs show retry attempts
+- **Status**: ✅ FIXED
 
 ### LSP-008: Health check after initialization ✅
 - **Problem**: Should verify LSP actually responds after `initialize`
