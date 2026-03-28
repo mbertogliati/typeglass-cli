@@ -23,7 +23,7 @@ impl WiredAdapters {
             workspace: Arc::new(WorkspaceAdapter { root: workspace_root.clone(), language }),
             filesystem: Arc::new(FileSystemAdapter),
             daemon: Arc::new(DaemonAdapter),
-            lsp: Arc::new(LspAdapter { workspace_root, language }),
+            lsp: Arc::new(LspAdapter::new(workspace_root, language)),  // Use ::new() which creates daemon
             clock: Arc::new(ClockAdapter),
         }
     }
@@ -158,13 +158,24 @@ impl DaemonPort for DaemonAdapter {
 // ============================================================================
 
 // ============================================================================
-// LspAdapter - Uses LazyGraphBuilder under the hood
+// LspAdapter - Uses PERSISTENT LSP daemon (not one-shot LazyGraphBuilder)
 // ============================================================================
 
-#[derive(Clone)]  // Make cloneable so it can be moved into async blocks
+#[derive(Clone)]
 pub struct LspAdapter {
     workspace_root: PathBuf,
     language: Language,
+    daemon: Arc<crate::infrastructure::LspDaemon>,  // Persistent daemon
+}
+
+impl LspAdapter {
+    pub fn new(workspace_root: PathBuf, language: Language) -> Self {
+        Self {
+            workspace_root: workspace_root.clone(),
+            language,
+            daemon: Arc::new(crate::infrastructure::LspDaemon::new(workspace_root, language)),
+        }
+    }
 }
 
 impl LspPort for LspAdapter {
@@ -172,18 +183,24 @@ impl LspPort for LspAdapter {
     type InvalidateFuture<'a> = Pin<Box<dyn Future<Output = Result<crate::domain::lsp::InvalidationResult, LspPortError>> + Send + 'a>>;
 
     fn run_query<'a>(&'a self, request: LspQueryRequest) -> Self::QueryFuture<'a> {
-        let workspace_root = self.workspace_root.clone();
-        let language = self.language;
+        let daemon = self.daemon.clone();
 
         Box::pin(async move {
-            // Create LSP client
-            let mut builder = crate::infrastructure::LazyGraphBuilder::new(workspace_root, language)
-                .await
+            // Get LSP client from daemon (creates if needed, reuses if exists)
+            let lsp_client_arc = daemon.get_lsp_client().await
                 .map_err(|e| LspPortError::QueryFailed {
                     source: crate::domain::lsp::LspError::WorkspaceError {
-                        message: format!("Failed to initialize LSP: {}", e),
+                        message: format!("Failed to get LSP client from daemon: {}", e),
                     },
                 })?;
+            
+            // Lock the client and execute query
+            let mut guard = lsp_client_arc.lock().await;
+            let builder = guard.as_mut().ok_or_else(|| LspPortError::QueryFailed {
+                source: crate::domain::lsp::LspError::WorkspaceError {
+                    message: "LSP client not initialized".to_string(),
+                },
+            })?;
 
             // Execute query based on type
             let graph = match &request.query {
@@ -206,12 +223,11 @@ impl LspPort for LspAdapter {
                 }
             };
 
-            // Shutdown LSP client
-            let _ = builder.shutdown().await;
+            // Note: DON'T shutdown the builder - it's persistent in the daemon!
 
             Ok(LspQueryResponse {
                 graph: Some(graph),
-                capabilities: None, // TODO: Extract from LSP server capabilities
+                capabilities: None,
             })
         })
     }

@@ -3,11 +3,13 @@ pub mod lsp;
 pub mod persistence;
 pub mod filesystem;
 pub mod adapters;
+pub mod daemon;  // Add daemon module
 
 // Re-export commonly used types
 pub use lsp::{LazyGraphBuilder, LspClient, LspProcess};
 pub use persistence::cache::{CacheError, GraphCache};
 pub use filesystem::{SymbolFinder, SymbolFinderError};
+pub use daemon::LspDaemon;  // Export daemon
 
 
 pub use lsp::graph_builder::*;
