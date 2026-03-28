@@ -156,7 +156,7 @@ mod traversal_types_tests {
             import_path: None,
             crosses_package_boundary: false,
         };
-
+        
         assert!(internal.is_internal());
         assert!(!internal.is_external());
     }
