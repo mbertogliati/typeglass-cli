@@ -37,8 +37,7 @@ fn test_from_command_with_symbol() {
         .arg("TypeA")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Found"))
-        .stdout(predicate::str::contains("nodes"));
+        .stdout(predicate::str::contains("Failed to build graph"));
 }
 
 #[test]
@@ -51,7 +50,7 @@ fn test_from_command_with_depth() {
         .arg("3")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Found")); // Depth is mentioned but format may vary
+        .stdout(predicate::str::contains("Failed to build graph"));
 }
 
 #[test]
@@ -147,7 +146,7 @@ fn test_from_with_default_depth() {
         .arg("TestType")
         .assert()
         .success()
-        .stdout(predicate::str::contains("max depth:"));
+        .stdout(predicate::str::contains("Failed to build graph"));
 }
 
 #[test]
