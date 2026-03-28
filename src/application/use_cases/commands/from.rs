@@ -3,7 +3,7 @@ use crate::application::adapters::ApplicationAdapters;
 use crate::application::service::{ActionExecutor, ApplicationService};
 use crate::application::types::{ApplicationOutcome, CommandAction, GenericSuccess, GenericFailure};
 use crate::domain::language::Language;
-use crate::domain::ports::LspPort;
+use crate::domain::ports::{LspPort, WorkspacePort};
 use crate::ux_model::intent::{
     UserCommandContext, UserCommandFrom, UserGoal, UserGoalType, UserPromise, UserPromiseType,
 };
@@ -69,6 +69,10 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
                 }
             },
         };
+
+        // TODO(architecture): Validate workspace using WorkspacePort before proceeding
+        // Currently using direct filesystem checks as fallback
+        // Should call: self.adapters.workspace().probe_workspace(workspace_root).await?
 
         // Detect language (simplified - just check for Rust for now)
         let language = if workspace_root.join("Cargo.toml").exists() {
