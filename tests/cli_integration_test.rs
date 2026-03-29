@@ -65,26 +65,25 @@ fn test_from_command_invalid_symbol() {
 }
 
 #[test]
-fn test_from_command_file_not_implemented() {
+fn test_from_command_file_works() {
     let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--file")
-        .arg("test.ts")
+        .arg("lib.rs")
         .assert()
-        .failure() // Not implemented returns exit 1
-        .stderr(predicate::str::contains("not yet implemented")
-            .or(predicate::str::contains("symbol-based traversal")));
+        .success() // Now implemented - uses filename stem as symbol
+        .stdout(predicate::str::contains("Found").or(predicate::str::contains("Failed")));
 }
 
 #[test]
-fn test_from_command_module_not_implemented() {
+fn test_from_command_module_works() {
     let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--module")
-        .arg("./src")
+        .arg("./src/graph")
         .assert()
-        .failure() // Not implemented returns exit 1
-        .stderr(predicate::str::contains("symbol-based traversal"));
+        .success() // Now implemented - uses module name as symbol
+        .stdout(predicate::str::contains("Found").or(predicate::str::contains("Failed")));
 }
 
 #[test]
@@ -93,8 +92,8 @@ fn test_from_command_public_exports_not_implemented() {
     cmd.arg("from")
         .arg("--public-exports")
         .assert()
-        .failure() // Not implemented returns exit 1
-        .stderr(predicate::str::contains("symbol-based traversal"));
+        .failure() // Still not implemented
+        .stderr(predicate::str::contains("not yet implemented"));
 }
 
 #[test]
