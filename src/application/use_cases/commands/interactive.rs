@@ -5,6 +5,7 @@ use crate::application::types::{CommandAction, GenericSuccess, GenericPartial, G
 use crate::application::service::{ActionExecutor, ApplicationService};
 use crate::application::adapters::ApplicationAdapters;
 use crate::domain::language::Language;
+use crate::domain::ports::LspPort;
 
 impl CommandAction for UserCommandInteractive {
     type Success = GenericSuccess;
@@ -132,8 +133,43 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandInteractive> for Applicat
                             }
                             let symbol = parts[1];
                             println!("🔍 Exploring symbol: {}", symbol);
-                            println!("(LSP graph building not yet wired to REPL)");
-                            println!("Hint: Use 'typeglass from --symbol {}' in non-interactive mode", symbol);
+                            
+                            // Query LSP through port
+                            let depth = match crate::domain::lsp::Depth::new(3) {
+                                Ok(d) => d,
+                                Err(_) => {
+                                    println!("❌ Invalid depth");
+                                    continue;
+                                }
+                            };
+                            
+                            let lsp_request = crate::domain::ports::LspQueryRequest {
+                                query: crate::domain::lsp::LspQuery::FromSymbol {
+                                    symbol: symbol.to_string(),
+                                    depth,
+                                },
+                                timeout: crate::domain::lsp::QueryTimeout(std::time::Duration::from_secs(10)),
+                            };
+                            
+                            let lsp_adapter = (*self.adapters.lsp()).clone();
+                            match lsp_adapter.run_query(lsp_request).await {
+                                Ok(response) => {
+                                    if let Some(graph) = response.graph {
+                                        println!("✅ Found {} nodes, {} edges", 
+                                            graph.nodes().len(), 
+                                            graph.edges().len()
+                                        );
+                                        if !graph.warnings().is_empty() {
+                                            println!("⚠️  {} warnings", graph.warnings().len());
+                                        }
+                                    } else {
+                                        println!("❌ Symbol not found");
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("❌ Query failed: {}", e);
+                                }
+                            }
                         },
                         "list" => {
                             println!("📋 Listing symbols...");
