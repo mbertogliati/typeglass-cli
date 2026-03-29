@@ -35,18 +35,26 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
                 
                 (format!("file '{}'", path.display()), symbol)
             }
-            crate::ux_model::intent::FromTarget::Module(_)
-            | crate::ux_model::intent::FromTarget::PublicExports => {
+            crate::ux_model::intent::FromTarget::Module(path) => {
+                // Use last path component as module name
+                let module_name = path.file_name()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                
+                (format!("module '{}'", path.display()), module_name)
+            }
+            crate::ux_model::intent::FromTarget::PublicExports => {
                 return UserResult::Failure(GenericFailure {
                     promises: vec![
                         UserPromise(UserPromiseType::NeverSilentWrong),
                         UserPromise(UserPromiseType::ErrorsAreExplicit),
                     ],
-                    summary: UserSummary("Module and public exports traversal not yet implemented".to_string()),
+                    summary: UserSummary("Public exports traversal not yet implemented".to_string()),
                     limitations: vec![UserLimitation(
-                        "Use --symbol or --file instead".to_string(),
+                        "Use --symbol, --file, or --module instead".to_string(),
                     )],
-                    next_step: UserNextStep("Try 'typeglass from --symbol MyType' or 'typeglass from --file src/lib.rs'".to_string()),
+                    next_step: UserNextStep("Try 'typeglass from --symbol MyType'".to_string()),
                     context: UserResultContext {
                         command_context: context,
                     },
