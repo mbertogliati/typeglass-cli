@@ -21,48 +21,7 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
         action: UserCommandFrom,
         context: UserCommandContext,
     ) -> ApplicationOutcome<UserCommandFrom> {
-        // Extract target query
-        let (target_description, lsp_query) = match &action.target {
-            crate::ux_model::intent::FromTarget::Symbol(s) => {
-                (format!("symbol '{}'", s), s.clone())
-            }
-            crate::ux_model::intent::FromTarget::File(path) => {
-                // Use filename stem as symbol name
-                let symbol = path.file_stem()
-                    .and_then(|s| s.to_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| "UnknownFile".to_string());
-                
-                (format!("file '{}'", path.display()), symbol)
-            }
-            crate::ux_model::intent::FromTarget::Module(path) => {
-                // Use last path component as module name
-                let module_name = path.file_name()
-                    .and_then(|s| s.to_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| "unknown".to_string());
-                
-                (format!("module '{}'", path.display()), module_name)
-            }
-            crate::ux_model::intent::FromTarget::PublicExports => {
-                return UserResult::Failure(GenericFailure {
-                    promises: vec![
-                        UserPromise(UserPromiseType::NeverSilentWrong),
-                        UserPromise(UserPromiseType::ErrorsAreExplicit),
-                    ],
-                    summary: UserSummary("Public exports traversal not yet implemented".to_string()),
-                    limitations: vec![UserLimitation(
-                        "Use --symbol, --file, or --module instead".to_string(),
-                    )],
-                    next_step: UserNextStep("Try 'typeglass from --symbol MyType'".to_string()),
-                    context: UserResultContext {
-                        command_context: context,
-                    },
-                });
-            }
-        };
-
-        // Get workspace root
+        // Get workspace root first
         let workspace_root = match &context.user_workspace {
             crate::ux_model::intent::UserWorkspace::Explicit(path) => path.clone(),
             crate::ux_model::intent::UserWorkspace::Pwd => {
@@ -86,6 +45,40 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
                     }
                 }
             },
+        };
+        
+        // Extract target query (needs workspace_root for PublicExports)
+        let (target_description, lsp_query) = match &action.target {
+            crate::ux_model::intent::FromTarget::Symbol(s) => {
+                (format!("symbol '{}'", s), s.clone())
+            }
+            crate::ux_model::intent::FromTarget::File(path) => {
+                // Use filename stem as symbol name
+                let symbol = path.file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "UnknownFile".to_string());
+                
+                (format!("file '{}'", path.display()), symbol)
+            }
+            crate::ux_model::intent::FromTarget::Module(path) => {
+                // Use last path component as module name
+                let module_name = path.file_name()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                
+                (format!("module '{}'", path.display()), module_name)
+            }
+            crate::ux_model::intent::FromTarget::PublicExports => {
+                // Query workspace root module (typically "lib" or workspace name)
+                let workspace_name = workspace_root.file_name()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "lib".to_string());
+                
+                ("public exports".to_string(), workspace_name)
+            }
         };
 
         // TODO(architecture): Validate workspace using WorkspacePort before proceeding

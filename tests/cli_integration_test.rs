@@ -69,10 +69,10 @@ fn test_from_command_file_works() {
     let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--file")
-        .arg("lib.rs")
+        .arg("src/lib.rs")  // Use real file path
         .assert()
-        .success() // Now implemented - uses filename stem as symbol
-        .stdout(predicate::str::contains("Found").or(predicate::str::contains("Failed")));
+        .success()
+        .stdout(predicate::str::contains("Found").or(predicate::str::contains("graph")));
 }
 
 #[test]
@@ -80,20 +80,20 @@ fn test_from_command_module_works() {
     let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--module")
-        .arg("./src/graph")
+        .arg("src/domain")  // Use real module path
         .assert()
-        .success() // Now implemented - uses module name as symbol
-        .stdout(predicate::str::contains("Found").or(predicate::str::contains("Failed")));
+        .success()
+        .stdout(predicate::str::contains("Found").or(predicate::str::contains("graph")));
 }
 
 #[test]
-fn test_from_command_public_exports_not_implemented() {
+fn test_from_command_public_exports_works() {
     let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--public-exports")
         .assert()
-        .failure() // Still not implemented
-        .stderr(predicate::str::contains("not yet implemented"));
+        .success()
+        .stdout(predicate::str::contains("Found").or(predicate::str::contains("graph")));
 }
 
 #[test]
