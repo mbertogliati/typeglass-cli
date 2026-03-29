@@ -21,22 +21,32 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
         action: UserCommandFrom,
         context: UserCommandContext,
     ) -> ApplicationOutcome<UserCommandFrom> {
-        // Extract symbol name from target
-        let target_str = match &action.target {
-            crate::ux_model::intent::FromTarget::Symbol(s) => s.clone(),
-            crate::ux_model::intent::FromTarget::File(_)
-            | crate::ux_model::intent::FromTarget::Module(_)
+        // Extract target query
+        let (target_description, lsp_query) = match &action.target {
+            crate::ux_model::intent::FromTarget::Symbol(s) => {
+                (format!("symbol '{}'", s), s.clone())
+            }
+            crate::ux_model::intent::FromTarget::File(path) => {
+                // Use filename stem as symbol name
+                let symbol = path.file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "UnknownFile".to_string());
+                
+                (format!("file '{}'", path.display()), symbol)
+            }
+            crate::ux_model::intent::FromTarget::Module(_)
             | crate::ux_model::intent::FromTarget::PublicExports => {
                 return UserResult::Failure(GenericFailure {
                     promises: vec![
                         UserPromise(UserPromiseType::NeverSilentWrong),
                         UserPromise(UserPromiseType::ErrorsAreExplicit),
                     ],
-                    summary: UserSummary("Only symbol-based traversal is currently implemented".to_string()),
+                    summary: UserSummary("Module and public exports traversal not yet implemented".to_string()),
                     limitations: vec![UserLimitation(
-                        "File, module, and public exports traversal are not yet supported".to_string(),
+                        "Use --symbol or --file instead".to_string(),
                     )],
-                    next_step: UserNextStep("Use a symbol name instead, e.g., 'typeglass from MyType'".to_string()),
+                    next_step: UserNextStep("Try 'typeglass from --symbol MyType' or 'typeglass from --file src/lib.rs'".to_string()),
                     context: UserResultContext {
                         command_context: context,
                     },
@@ -124,7 +134,7 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
         
         let lsp_request = crate::domain::ports::LspQueryRequest {
             query: crate::domain::lsp::LspQuery::FromSymbol {
-                symbol: target_str.clone(),
+                symbol: lsp_query.clone(),
                 depth,
             },
             timeout: crate::domain::lsp::QueryTimeout(std::time::Duration::from_secs(30)),
@@ -148,9 +158,9 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
                                 UserPromise(UserPromiseType::NeverSilentWrong),
                                 UserPromise(UserPromiseType::ErrorsAreActionable),
                             ],
-                            summary: UserSummary(format!("No graph found for symbol '{}'", target_str)),
+                            summary: UserSummary(format!("No graph found for {}", target_description)),
                             limitations: vec![UserLimitation("LSP returned empty response".to_string())],
-                            next_step: UserNextStep("Check if the symbol exists in your workspace".to_string()),
+                            next_step: UserNextStep("Check if the symbol/file exists in your workspace".to_string()),
                             context: UserResultContext {
                                 command_context: context,
                             },
@@ -167,8 +177,8 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
                 };
 
                 let summary = format!(
-                    "Found {} nodes and {} edges from '{}' ({} graph, language: {:?})",
-                    node_count, edge_count, target_str, completeness, language
+                    "Found {} nodes and {} edges from {} ({} graph, language: {:?})",
+                    node_count, edge_count, target_description, completeness, language
                 );
 
                 UserResult::Success(GenericSuccess {
