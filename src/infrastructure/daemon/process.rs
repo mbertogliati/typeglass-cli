@@ -117,6 +117,13 @@ impl LspDaemon {
         
         Ok(())
     }
+    
+    /// Invalidate cache for changed files
+    pub async fn invalidate_cache(&self, changed_files: &[PathBuf]) -> Result<usize, DaemonError> {
+        let cache = self.cache.lock().await;
+        cache.clear_for_files(changed_files)
+            .map_err(|e| DaemonError::QueryFailed(format!("Cache invalidation failed: {}", e)))
+    }
 }
 
 impl Clone for LspDaemon {

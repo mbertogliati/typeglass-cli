@@ -138,6 +138,24 @@ impl GraphCache {
             .map_err(CacheError::DirectoryCreationFailed)?;
         Ok(())
     }
+    
+    /// Invalidate cache entries for specific files
+    /// Currently invalidates ALL cache (conservative approach)
+    /// TODO: Track which symbols come from which files for selective invalidation
+    pub fn clear_for_files(&self, _files: &[PathBuf]) -> Result<usize, CacheError> {
+        // Conservative: Clear entire cache when any file changes
+        // Reasoning: TypeGraph can span multiple files, hard to track exact dependencies
+        let entries_before = self.count_entries();
+        self.clear()?;
+        Ok(entries_before)
+    }
+    
+    /// Count cache entries (for metrics)
+    fn count_entries(&self) -> usize {
+        std::fs::read_dir(&self.cache_dir)
+            .map(|entries| entries.filter_map(Result::ok).count())
+            .unwrap_or(0)
+    }
 }
 
 #[cfg(test)]

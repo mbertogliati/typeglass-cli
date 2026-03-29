@@ -216,12 +216,24 @@ impl LspPort for LspAdapter {
         })
     }
 
-    fn invalidate<'a>(&'a self, _request: crate::domain::lsp::InvalidationRequest) -> Self::InvalidateFuture<'a> {
+    fn invalidate<'a>(&'a self, request: crate::domain::lsp::InvalidationRequest) -> Self::InvalidateFuture<'a> {
+        let daemon = self.daemon.clone();
         Box::pin(async move {
-            // TODO: Implement cache invalidation
+            // Convert WorkspaceFile to PathBuf
+            let files: Vec<PathBuf> = request.files.iter()
+                .map(|wf| wf.as_path().to_path_buf())
+                .collect();
+            
+            // Invalidate cache for changed files
+            let invalidated_count = daemon.invalidate_cache(&files)
+                .await
+                .map_err(|e| LspPortError::InvalidateFailed {
+                    reason: format!("Cache invalidation failed: {}", e),
+                })?;
+            
             Ok(crate::domain::lsp::InvalidationResult {
-                reindexed: false,
-                invalidated_files: 0,
+                reindexed: false,  // No LSP reindex yet, just cache clear
+                invalidated_files: invalidated_count,
             })
         })
     }
