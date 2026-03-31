@@ -71,13 +71,40 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
                 (format!("module '{}'", path.display()), module_name)
             }
             crate::ux_model::intent::FromTarget::PublicExports => {
-                // Query workspace root module (typically "lib" or workspace name)
-                let workspace_name = workspace_root.file_name()
+                // For public exports, find the root source file and extract its name
+                // Strategy:
+                // 1. For Rust: Look for src/lib.rs first, then src/main.rs
+                // 2. For TypeScript: Look for src/index.ts or index.ts
+                // 3. For Go: Look for main.go or the module name
+                // Use the file stem as the symbol name
+                
+                let root_source_file = if workspace_root.join("Cargo.toml").exists() {
+                    // Rust project
+                    if workspace_root.join("src/lib.rs").exists() {
+                        workspace_root.join("src/lib.rs")
+                    } else if workspace_root.join("src/main.rs").exists() {
+                        workspace_root.join("src/main.rs")
+                    } else {
+                        workspace_root.join("src/lib.rs") // Fallback, will error later
+                    }
+                } else if workspace_root.join("package.json").exists() {
+                    // TypeScript project
+                    if workspace_root.join("src/index.ts").exists() {
+                        workspace_root.join("src/index.ts")
+                    } else {
+                        workspace_root.join("index.ts")
+                    }
+                } else {
+                    // Go or other - fallback to main.go
+                    workspace_root.join("main.go")
+                };
+                
+                let symbol = root_source_file.file_stem()
                     .and_then(|s| s.to_str())
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "lib".to_string());
                 
-                ("public exports".to_string(), workspace_name)
+                ("public exports".to_string(), symbol)
             }
         };
 
