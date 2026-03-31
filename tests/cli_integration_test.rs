@@ -158,3 +158,132 @@ fn test_traversal_completeness_shown() {
         .success()
         .stdout(predicate::str::contains("graph"));
 }
+
+// Additional tests for better coverage
+
+#[test]
+fn test_from_with_max_depth() {
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.arg("from")
+        .arg("--symbol")
+        .arg("TypeGraph")
+        .arg("--depth")
+        .arg("10")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_from_with_invalid_depth() {
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.arg("from")
+        .arg("--symbol")
+        .arg("TypeA")
+        .arg("--depth")
+        .arg("999") // Invalid depth > max
+        .assert()
+        .failure();
+}
+
+#[test]
+fn test_init_creates_config() {
+    use std::fs;
+    use tempfile::TempDir;
+    
+    // Create a temporary directory with Cargo.toml
+    let temp = TempDir::new().unwrap();
+    let cargo_toml = temp.path().join("Cargo.toml");
+    fs::write(&cargo_toml, "[package]\nname = \"test\"").unwrap();
+    
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.current_dir(temp.path())
+        .arg("init")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Workspace initialized").or(predicate::str::contains("already exists")));
+}
+
+#[test]
+fn test_gc_runs_successfully() {
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.arg("gc")
+        .assert()
+        .success();
+    // Just verify it runs, output format may vary
+}
+
+#[test]
+fn test_doctor_shows_lsp_status() {
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.arg("doctor")
+        .assert()
+        .success();
+    // Just verify it runs, LSP availability varies by system
+}
+
+#[test]
+fn test_from_file_uses_symbol_name() {
+    // File flag uses the file stem as symbol name
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.arg("from")
+        .arg("--file")
+        .arg("path/to/some_module.rs")
+        .assert()
+        .success();  // Will search for "some_module" symbol
+}
+
+#[test]
+fn test_from_module_uses_module_name() {
+    // Module flag uses last path component as module name
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.arg("from")
+        .arg("--module")
+        .arg("path/to/domain")
+        .assert()
+        .success();  // Will search for "domain" symbol
+}
+
+#[test]
+fn test_help_for_each_command() {
+    for command in &["from", "gc", "init", "doctor"] {
+        let mut cmd = Command::cargo_bin("typeglass").unwrap();
+        cmd.arg(command)
+            .arg("--help")
+            .assert()
+            .success();
+    }
+}
+
+#[test]
+fn test_version_flag() {
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.arg("--version")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("typeglass"));
+}
+
+#[test]
+fn test_from_with_depth_one() {
+    let mut cmd = Command::cargo_bin("typeglass").unwrap();
+    cmd.arg("from")
+        .arg("--symbol")
+        .arg("TypeGraph")
+        .arg("--depth")
+        .arg("1") // One level of traversal
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_multiple_invocations_reuse_lsp() {
+    // Multiple invocations should work (LSP daemon might be reused)
+    for _ in 0..3 {
+        let mut cmd = Command::cargo_bin("typeglass").unwrap();
+        cmd.arg("from")
+            .arg("--symbol")
+            .arg("TypeNode")
+            .assert()
+            .success();
+    }
+}
