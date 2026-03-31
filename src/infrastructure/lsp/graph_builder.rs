@@ -7,6 +7,7 @@ use crate::domain::graph::{
 };
 use crate::domain::language::{Language, LspServerConfig};
 use crate::infrastructure::{LspClient, LspClientError, Location, SymbolFinderError};
+use crate::infrastructure::lsp::init::HoverContents;
 
 /// Lazy graph builder - builds TypeGraph incrementally via LSP queries
 pub struct LazyGraphBuilder {
@@ -136,22 +137,38 @@ impl LazyGraphBuilder {
                                 reference.range.start.line,
                                 reference.range.start.character);
                             
-                            // Strategy: Use file path to infer containing symbol
-                            // Full implementation would query documentSymbol or parse hover
+                            // Strategy: Query hover to get semantic information about the relationship
                             if let Some(using_symbol_name) = extract_symbol_from_path(&ref_loc.file_path) {
                                 let using_sym = SymbolName(using_symbol_name.clone());
                                 
                                 // Don't create self-edges
                                 if using_sym != symbol {
+                                    // Try to query hover, but don't fail the whole operation if it doesn't work
+                                    // Some reference positions might be invalid (e.g., at end of file)
+                                    let edge_kind = match self.lsp_client.query_hover(
+                                        &reference.uri,
+                                        reference.range.start.line,
+                                        reference.range.start.character,
+                                    ).await {
+                                        Ok(Some(hover_response)) => {
+                                            infer_edge_kind_from_hover(&hover_response.contents, &symbol.0)
+                                        }
+                                        Ok(None) | Err(_) => {
+                                            // No hover info or query failed - default to Contains
+                                            // This is expected for some positions (whitespace, invalid offsets, etc.)
+                                            EdgeKind::Contains
+                                        }
+                                    };
+                                    
                                     // Create edge: using_symbol -> current_symbol (dependency)
                                     let edge = TypeEdge {
                                         from: using_sym.clone(),
                                         to: symbol.clone(),
-                                        kind: EdgeKind::Contains, // Simplified
+                                        kind: edge_kind,
                                     };
                                     
                                     graph.add_edge(edge);
-                                    log::debug!("DEBUG: Created edge: {} -> {}", using_sym.0, symbol.0);
+                                    log::debug!("DEBUG: Created edge: {} -> {} ({:?})", using_sym.0, symbol.0, edge_kind);
                                     
                                     // Add to queue for further traversal if within depth
                                     if depth + 1 < max_depth && !visited.contains(&using_sym) {
@@ -345,5 +362,64 @@ fn extract_symbol_from_path(path: &Path) -> Option<String> {
                 })
                 .collect::<String>()
         })
+}
+
+/// Infer EdgeKind from LSP hover response contents
+/// Analyzes hover text to determine semantic relationship type
+fn infer_edge_kind_from_hover(hover_contents: &HoverContents, target_symbol: &str) -> EdgeKind {
+    let text = extract_hover_text(hover_contents);
+    let text_lower = text.to_lowercase();
+    
+    // Check for trait implementation
+    // Patterns: "impl Trait for Type", "impl<T> Trait for Type<T>"
+    if text_lower.contains("impl") && text_lower.contains(" for ") {
+        log::debug!("DEBUG: Detected Implements relationship from hover: {}", text);
+        return EdgeKind::Extends; // In Rust, impl Trait for Type is more like Extends
+    }
+    
+    // Check for trait definition with supertraits
+    // Pattern: "trait Foo: Bar", "trait Foo: Bar + Baz"
+    if text_lower.contains("trait") && text_lower.contains(':') 
+        && !text_lower.contains("impl") {
+        log::debug!("DEBUG: Detected trait extension from hover: {}", text);
+        return EdgeKind::Extends;
+    }
+    
+    // Check for generic instantiation
+    // Patterns: "Type<Param>", "struct Foo<T: Trait>", "enum Bar<T>"
+    if (text_lower.contains("struct") || text_lower.contains("enum") || text_lower.contains("type")) 
+        && text.contains('<') && text.contains('>') 
+        && text.contains(target_symbol) {
+        // Check if the target symbol is used as a type parameter
+        if let Some(angle_start) = text.find('<') {
+            if let Some(angle_end) = text.find('>') {
+                let generic_part = &text[angle_start+1..angle_end];
+                if generic_part.contains(target_symbol) {
+                    log::debug!("DEBUG: Detected Instantiates relationship from hover: {}", text);
+                    return EdgeKind::Instantiates;
+                }
+            }
+        }
+    }
+    
+    // Check for enum variant
+    // Pattern: "Variant" in context of enum
+    if text_lower.contains("enum") || text_lower.contains("variant") {
+        log::debug!("DEBUG: Detected Variant relationship from hover: {}", text);
+        return EdgeKind::Variant;
+    }
+    
+    // Default: contains/uses relationship
+    log::debug!("DEBUG: Defaulting to Contains relationship for hover: {}", text);
+    EdgeKind::Contains
+}
+
+/// Extract text content from HoverContents enum
+fn extract_hover_text(hover_contents: &HoverContents) -> String {
+    match hover_contents {
+        HoverContents::Scalar(s) => s.clone(),
+        HoverContents::Array(arr) => arr.join("\n"),
+        HoverContents::Markup(markup) => markup.value.clone(),
+    }
 }
 
