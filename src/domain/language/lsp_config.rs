@@ -135,8 +135,8 @@ mod tests {
         let status = config.check_installation();
         // Should be either Installed or NotFound, never NotExecutable for 'ls'
         match status {
-            LspInstallStatus::Installed { .. } => assert!(true),
-            LspInstallStatus::NotFound => assert!(true),
+            LspInstallStatus::Installed { .. } => {},
+            LspInstallStatus::NotFound => {},
             LspInstallStatus::NotExecutable { .. } => panic!("ls should be executable"),
         }
     }

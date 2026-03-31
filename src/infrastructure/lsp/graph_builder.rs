@@ -1,5 +1,5 @@
 use std::collections::{HashSet, VecDeque};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::domain::graph::{
     EdgeKind, QualifiedSymbolName, SourceLocation, SymbolKind, SymbolName,
@@ -329,7 +329,7 @@ fn parse_lsp_location(loc: &crate::infrastructure::lsp::init::Location) -> Resul
 
 /// Extract likely symbol name from file path (heuristic for MVP)
 /// e.g., "src/domain/graph/model_graph.rs" -> Some("TypeGraph")
-fn extract_symbol_from_path(path: &PathBuf) -> Option<String> {
+fn extract_symbol_from_path(path: &Path) -> Option<String> {
     path.file_stem()
         .and_then(|s| s.to_str())
         .map(|s| {

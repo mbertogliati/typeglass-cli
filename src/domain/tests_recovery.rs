@@ -67,8 +67,7 @@ mod recovery_tests {
 
     #[test]
     fn recoverable_error_suggestions() {
-        let error = RecoverableError::<()>::new(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        let error = RecoverableError::<()>::new(Box::new(std::io::Error::other(
             "test",
         )))
         .suggest(RecoverySuggestion::retry(100, "Retry".to_string()));

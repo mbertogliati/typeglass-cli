@@ -163,7 +163,9 @@ impl DaemonPort for DaemonAdapter {
 
 #[derive(Clone)]
 pub struct LspAdapter {
+    #[allow(dead_code)]
     workspace_root: PathBuf,
+    #[allow(dead_code)]
     language: Language,
     daemon: Arc<crate::infrastructure::LspDaemon>,  // Persistent daemon
 }
@@ -275,9 +277,8 @@ mod tests {
 
     #[test]
     fn test_wired_adapters_creation() {
-        let adapters = WiredAdapters::new(PathBuf::from("/tmp/test"), Language::TypeScript);
-        // Just check it doesn't panic
-        assert!(true);
+        let _adapters = WiredAdapters::new(PathBuf::from("/tmp/test"), Language::TypeScript);
+        // Just check it doesn't panic - test passes if no panic occurs
     }
 
     #[test]
@@ -285,7 +286,7 @@ mod tests {
         let adapter = LspAdapter::new(PathBuf::from("/tmp/test"), Language::Rust);
         // Verify it's clonable
         let _cloned = adapter.clone();
-        assert!(true);
+        // Test passes if no panic occurs
     }
 
     #[tokio::test]

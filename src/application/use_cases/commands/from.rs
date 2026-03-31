@@ -3,7 +3,7 @@ use crate::application::adapters::ApplicationAdapters;
 use crate::application::service::{ActionExecutor, ApplicationService};
 use crate::application::types::{ApplicationOutcome, CommandAction, GenericSuccess, GenericFailure};
 use crate::domain::language::Language;
-use crate::domain::ports::{LspPort, WorkspacePort};
+use crate::domain::ports::LspPort;
 use crate::ux_model::intent::{
     UserCommandContext, UserCommandFrom, UserGoal, UserGoalType, UserPromise, UserPromiseType,
 };

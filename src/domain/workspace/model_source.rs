@@ -57,7 +57,7 @@ impl SourceFile {
                 },
                 _ => SourceFileError::NotReadable { 
                     path: self.0.clone(), 
-                    reason: io::Error::new(io::ErrorKind::Other, "Content error") 
+                    reason: io::Error::other("Content error") 
                 },
             })
     }

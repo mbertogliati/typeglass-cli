@@ -5,7 +5,7 @@ use typeglass_cli::infrastructure::adapters::WiredAdapters;
 use typeglass_cli::ux_model;
 use typeglass_cli::infrastructure::cli::UserRequest;
 use clap::Parser;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +24,7 @@ async fn main() {
         Ok(request) => request,
         Err(cli::IntentResolutionError::ShowHelp) => {
             // Print help and exit gracefully
-            cli::CliArgs::parse_from(&["typeglass", "--help"]);
+            cli::CliArgs::parse_from(["typeglass", "--help"]);
             unreachable!("clap will print help and exit");
         }
         Err(error) => {
@@ -110,7 +110,7 @@ where
 }
 
 /// Detect project language from workspace markers
-fn detect_language(workspace_root: &PathBuf) -> Language {
+fn detect_language(workspace_root: &Path) -> Language {
     if workspace_root.join("Cargo.toml").exists() {
         Language::Rust
     } else if workspace_root.join("package.json").exists() || workspace_root.join("tsconfig.json").exists() {

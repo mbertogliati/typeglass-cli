@@ -57,7 +57,7 @@ impl LspProcess {
         }
 
         // Start the process
-        let mut command = Command::new(&self.config.command);
+        let mut command = Command::new(self.config.command);
         command
             .args(self.config.args)
             .stdin(Stdio::piped())
@@ -78,15 +78,13 @@ impl LspProcess {
 
         // Take ownership of stdin/stdout
         let stdin = child.stdin.take().ok_or_else(|| {
-            LspProcessError::StartFailed(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            LspProcessError::StartFailed(std::io::Error::other(
                 "Failed to capture stdin",
             ))
         })?;
 
         let stdout = child.stdout.take().ok_or_else(|| {
-            LspProcessError::StartFailed(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            LspProcessError::StartFailed(std::io::Error::other(
                 "Failed to capture stdout",
             ))
         })?;

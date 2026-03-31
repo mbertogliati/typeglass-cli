@@ -262,10 +262,10 @@ mod tests {
     fn test_user_request_into_parts() {
         let ctx = UserCommandContext { user_workspace: UserWorkspace::Pwd };
         let cmd = UserCommandDoctor;
-        let req = UserRequest::terminal(cmd, ctx.clone());
+        let req = UserRequest::terminal(cmd.clone(), ctx.clone());
         
-        let (extracted_cmd, extracted_ctx) = req.into_parts();
-        assert_eq!(extracted_ctx.user_workspace, ctx.user_workspace);
+        let (extracted_cmd, _extracted_ctx) = req.into_parts();
+        assert_eq!(extracted_cmd, cmd);
     }
 
     #[test]

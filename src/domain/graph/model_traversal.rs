@@ -7,23 +7,21 @@ use super::symbols::{QualifiedSymbolName, SymbolKind, SymbolName};
 
 /// Direction of graph traversal from an entry point
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum TraversalDirection {
     /// Follow edges pointing TO the entry point (dependencies)
     Upstream,
     /// Follow edges pointing FROM the entry point (dependents)
+    #[default]
     Downstream,
     /// Follow edges in both directions
     Both,
 }
 
-impl Default for TraversalDirection {
-    fn default() -> Self {
-        Self::Downstream
-    }
-}
 
 /// Filters for controlling which symbols are included during traversal
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct TraversalFilter {
     /// Include only symbols matching these patterns (glob syntax)
     pub include_patterns: Vec<String>,
@@ -39,18 +37,6 @@ pub struct TraversalFilter {
     pub exclude_modules: Vec<PathBuf>,
 }
 
-impl Default for TraversalFilter {
-    fn default() -> Self {
-        Self {
-            include_patterns: Vec::new(),
-            exclude_patterns: Vec::new(),
-            include_kinds: None,
-            exclude_kinds: Vec::new(),
-            include_modules: Vec::new(),
-            exclude_modules: Vec::new(),
-        }
-    }
-}
 
 impl TraversalFilter {
     pub fn matches_symbol(&self, _symbol: &SymbolName, kind: &SymbolKind, module: &PathBuf) -> bool {

@@ -70,7 +70,7 @@ impl GraphTraversal {
                         TraversalDirection::Downstream => &edge.to,
                         TraversalDirection::Upstream => &edge.from,
                         TraversalDirection::Both => {
-                            if &edge.from == &current_symbol {
+                            if edge.from == current_symbol {
                                 &edge.to
                             } else {
                                 &edge.from

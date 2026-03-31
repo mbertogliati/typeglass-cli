@@ -192,20 +192,17 @@ pub enum LspFeature {
 
 /// Text document synchronization kind
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum TextDocumentSyncKind {
     /// Documents should not be synced
     None,
     /// Documents are synced by always sending full content
+    #[default]
     Full,
     /// Documents are synced by sending incremental updates
     Incremental,
 }
 
-impl Default for TextDocumentSyncKind {
-    fn default() -> Self {
-        Self::Full
-    }
-}
 
 /// Initialize result from server
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

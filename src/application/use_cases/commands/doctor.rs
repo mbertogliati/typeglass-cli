@@ -36,8 +36,8 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandDoctor> for ApplicationSe
                     LspInstallStatus::NotFound => {
                         all_installed = false;
                         limitations.push(UserLimitation(format!(
-                            "{} LSP not installed: {}",
-                            format!("{:?}", language),
+                            "{:?} LSP not installed: {}",
+                            language,
                             config.name
                         )));
                         ("❌", "NOT FOUND", String::new())
@@ -45,8 +45,8 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandDoctor> for ApplicationSe
                     LspInstallStatus::NotExecutable { path } => {
                         all_installed = false;
                         limitations.push(UserLimitation(format!(
-                            "{} LSP not executable: {} at {}",
-                            format!("{:?}", language),
+                            "{:?} LSP not executable: {} at {}",
+                            language,
                             config.name,
                             path.display()
                         )));

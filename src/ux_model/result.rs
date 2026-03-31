@@ -131,7 +131,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ux_model::intent::{UserCommandContext, UserWorkspace, UserGoalType, UserGoal, UserPromiseType, UserPromise};
+    use crate::ux_model::intent::{UserCommandContext, UserWorkspace};
 
     #[test]
     fn test_user_result_status() {

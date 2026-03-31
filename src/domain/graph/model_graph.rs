@@ -198,7 +198,6 @@ impl Default for PartialGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use std::path::PathBuf;
     use crate::domain::language::Language;
 

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
@@ -105,7 +105,7 @@ impl FileWatchPolicy {
         }
     }
 
-    pub fn should_ignore(&self, path: &PathBuf) -> bool {
+    pub fn should_ignore(&self, path: &Path) -> bool {
         // Simple pattern matching (would use glob crate in real impl)
         let path_str = path.to_string_lossy();
         self.ignore_patterns
