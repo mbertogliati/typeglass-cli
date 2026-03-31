@@ -12,6 +12,9 @@ mod tests_traversal;
 #[path = "tests_traversal_engine.rs"]
 #[cfg(test)]
 mod tests_traversal_engine;
+#[path = "tests_edgekind.rs"]
+#[cfg(test)]
+mod tests_edgekind;
 
 pub use errors::*;
 pub use impl_traversal::GraphTraversal;

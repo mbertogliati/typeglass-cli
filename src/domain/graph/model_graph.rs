@@ -20,7 +20,7 @@ pub struct TypeNode {
     pub generic_parameters: Vec<TypeParameterName>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EdgeKind {
     Contains,
     Extends,
