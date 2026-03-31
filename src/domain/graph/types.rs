@@ -9,6 +9,9 @@ mod policy;
 #[path = "tests_traversal.rs"]
 #[cfg(test)]
 mod tests_traversal;
+#[path = "tests_traversal_engine.rs"]
+#[cfg(test)]
+mod tests_traversal_engine;
 
 pub use errors::*;
 pub use impl_traversal::GraphTraversal;
