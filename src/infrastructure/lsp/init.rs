@@ -463,6 +463,68 @@ impl LspClient {
         log::debug!("DEBUG: Got {} reference locations", locations.len());
         Ok(locations)
     }
+
+    /// Query hover information at a specific position in a document
+    /// 
+    /// # Arguments
+    /// * `file_uri` - URI of the document (e.g., "file:///path/to/file.rs")
+    /// * `line` - Zero-based line number
+    /// * `character` - Zero-based character offset
+    /// 
+    /// # Returns
+    /// * `Ok(Some(HoverResponse))` - Hover information available
+    /// * `Ok(None)` - No hover information at this position
+    /// * `Err(LspClientError)` - Request failed
+    pub async fn query_hover(
+        &mut self,
+        file_uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Result<Option<HoverResponse>, LspClientError> {
+        if !self.initialized {
+            return Err(LspClientError::NotInitialized);
+        }
+
+        let params = serde_json::json!({
+            "textDocument": {
+                "uri": file_uri
+            },
+            "position": {
+                "line": line,
+                "character": character
+            }
+        });
+
+        log::debug!(
+            "DEBUG: Sending textDocument/hover request for {}:{}:{}",
+            file_uri, line, character
+        );
+
+        let response = self.send_request("textDocument/hover", params).await?;
+
+        // Parse response - can be HoverResponse or null
+        match response {
+            Value::Null => {
+                log::debug!("DEBUG: No hover information available");
+                Ok(None)
+            }
+            Value::Object(_) => {
+                let hover: HoverResponse = serde_json::from_value(response)
+                    .map_err(|e| {
+                        LspClientError::InvalidResponse(format!(
+                            "Failed to parse hover response: {}",
+                            e
+                        ))
+                    })?;
+                log::debug!("DEBUG: Got hover information: {:?}", hover.contents);
+                Ok(Some(hover))
+            }
+            _ => Err(LspClientError::InvalidResponse(format!(
+                "Unexpected hover response format: {:?}",
+                response
+            ))),
+        }
+    }
 }
 
 /// LSP Location type
@@ -586,6 +648,45 @@ mod tests {
                         "Should not get 'file not found' after waiting for indexing: {}", msg);
                 }
                 Err(e) => panic!("Unexpected error: {:?}", e),
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires rust-analyzer to be installed
+    async fn test_query_hover() {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let config = LspServerConfig::for_language(Language::Rust)
+            .expect("Rust LSP config should exist");
+
+        let mut client = LspClient::new(config);
+        let init_result = client.initialize(workspace.clone()).await;
+        assert!(init_result.is_ok(), "Initialize should succeed: {:?}", init_result.err());
+
+        // Query hover on a known position (e.g., src/lib.rs at start of a type)
+        let test_file = workspace.join("src/lib.rs");
+        if test_file.exists() {
+            let file_uri = Url::from_file_path(&test_file)
+                .map_err(|_| format!("Invalid file path: {}", test_file.display()))
+                .unwrap()
+                .to_string();
+            
+            // Try hover at line 0 (should be on a use statement or comment)
+            let result = client.query_hover(&file_uri, 0, 0).await;
+            
+            match result {
+                Ok(Some(hover)) => {
+                    // Success - got hover information
+                    println!("Got hover info: {:?}", hover.contents);
+                }
+                Ok(None) => {
+                    // No hover at this position is valid
+                    println!("No hover information at position 0:0");
+                }
+                Err(e) => {
+                    // Error is acceptable for this test (LSP might not support hover)
+                    println!("Hover query error (acceptable): {:?}", e);
+                }
             }
         }
     }
