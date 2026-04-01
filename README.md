@@ -254,12 +254,24 @@ cargo tarpaulin --out Html
 
 ## Contributing
 
+This project follows **GitFlow** for branch management:
+
+- **`main`** - Production code, only merged from `release/*`
+- **`develop`** - Integration branch for development  
+- **`feature/*`** - New features
+- **`release/*`** - Release preparation
+
+See [GITFLOW.md](GITFLOW.md) for detailed workflow and CI/CD automation.
+
 Contributions welcome! Please:
 1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass and clippy is clean
-5. Submit a pull request
+2. Create a feature branch from `develop`
+3. Follow [Conventional Commits](https://www.conventionalcommits.org/)
+4. Add tests for new functionality
+5. Ensure all tests pass and clippy is clean
+6. Submit PR to `develop`
+
+All PRs must pass CI checks (tests, clippy, coverage ≥ 60%) before merging.
 
 See [RELEASING.md](RELEASING.md) for release process.
 
