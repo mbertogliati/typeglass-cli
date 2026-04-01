@@ -1,0 +1,49 @@
+[package]
+name = "typeglass-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Navigate type relationships lazily through LSP - CLI tool for exploring type dependencies on-demand"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/YOUR_USERNAME/typeglass-cli"
+homepage = "https://github.com/YOUR_USERNAME/typeglass-cli"
+documentation = "https://docs.rs/typeglass-cli"
+readme = "README.md"
+keywords = ["lsp", "types", "graph", "cli", "analysis"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = [
+    ".github/",
+    "tests/fixtures/",
+    "*.log",
+]
+
+[[bin]]
+name = "typeglass"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+env_logger = "0.11"
+log = "0.4"
+regex = "1.10"
+rustyline = "17.0.2"
+sealed = "0.6.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "io-util", "process", "time"] }
+tower-lsp = "0.20"
+url = "2.5"
+uuid = { version = "1", features = ["v4", "serde"] }
+which = "6.0"
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2.0"
+predicates = "3.0"
+dirs = "5.0"
+criterion = "0.5"
+
+[[bench]]
+name = "graph_traversal"
+harness = false

@@ -1,0 +1,156 @@
+use clap::Parser;
+use thiserror::Error;
+
+use super::types::{CliArgs, FromArgs, FromArgsError, QueryTarget, ResolvedFromCommand, OutputFormat};
+use crate::infrastructure::cli::CliCommand;
+use crate::ux_model::intent::{
+    UserCommandContext, UserCommandDoctor, UserCommandFrom, UserCommandGc, UserCommandInit,
+    UserCommandInteractive, UserWorkspace,
+};
+
+pub fn parse_cli() -> CliArgs {
+    CliArgs::parse()
+}
+
+pub fn resolve_from_args(args: FromArgs) -> Result<ResolvedFromCommand, FromArgsError> {
+    let mut targets = Vec::new();
+
+    if let Some(symbol) = args.symbol {
+        targets.push(QueryTarget::Symbol(symbol));
+    }
+    if let Some(file) = args.file {
+        targets.push(QueryTarget::File(file));
+    }
+    if let Some(module) = args.module {
+        targets.push(QueryTarget::Module(module));
+    }
+    if args.public_exports {
+        targets.push(QueryTarget::PublicExports);
+    }
+
+    match targets.len() {
+        0 => Err(FromArgsError::MissingTarget),
+        1 => Ok(ResolvedFromCommand {
+            target: targets.remove(0),
+            depth: args.depth,
+            format: args.format,
+        }),
+        _ => Err(FromArgsError::MultipleTargets),
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum IntentResolutionError {
+    #[error("Cannot resolve `from` command. Reason: {source}")]
+    InvalidFromCommand { source: FromArgsError },
+    #[error("No command provided. Use --help to see available commands.")]
+    ShowHelp,
+}
+
+pub enum UserRequest {
+    From(crate::ux_model::intent::UserRequest<UserCommandFrom>, OutputFormat, bool), // format, debug
+    Gc(crate::ux_model::intent::UserRequest<UserCommandGc>, bool, bool),
+    Doctor(crate::ux_model::intent::UserRequest<UserCommandDoctor>, bool, bool),
+    Init(crate::ux_model::intent::UserRequest<UserCommandInit>, bool, bool),
+    Interactive(crate::ux_model::intent::UserRequest<UserCommandInteractive>, bool, bool),
+}
+
+pub fn resolve_intent(args: CliArgs) -> Result<UserRequest, IntentResolutionError> {
+    let context = UserCommandContext {
+        user_workspace: UserWorkspace::Pwd,
+    };
+    
+    let json_output = args.json;
+    let debug = args.debug;
+
+    let command = match args.command {
+        Some(cmd) => cmd,
+        None => {
+            // No command provided - show help and exit gracefully
+            return Err(IntentResolutionError::ShowHelp);
+        }
+    };
+
+    match command {
+        CliCommand::From(from_args) => {
+            let resolved = resolve_from_args(from_args)
+                .map_err(|source| IntentResolutionError::InvalidFromCommand { source })?;
+            let cmd = match resolved.target {
+                QueryTarget::Symbol(symbol) => UserCommandFrom::symbol(symbol, resolved.depth),
+                QueryTarget::File(file) => UserCommandFrom::file(file, resolved.depth),
+                QueryTarget::Module(module) => UserCommandFrom::module(module, resolved.depth),
+                QueryTarget::PublicExports => UserCommandFrom::public_exports(resolved.depth),
+            };
+            Ok(UserRequest::From(crate::ux_model::intent::UserRequest::terminal(cmd, context), resolved.format, debug))
+        }
+        CliCommand::Gc => {
+            Ok(UserRequest::Gc(crate::ux_model::intent::UserRequest::terminal(UserCommandGc, context), json_output, debug))
+        }
+        CliCommand::Doctor => {
+            Ok(UserRequest::Doctor(crate::ux_model::intent::UserRequest::terminal(UserCommandDoctor, context), json_output, debug))
+        }
+        CliCommand::Init => {
+            Ok(UserRequest::Init(crate::ux_model::intent::UserRequest::terminal(UserCommandInit, context), json_output, debug))
+        }
+        CliCommand::Interactive => {
+            Ok(UserRequest::Interactive(crate::ux_model::intent::UserRequest::interactive(UserCommandInteractive, context), json_output, debug))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_from_args_requires_target() {
+        let args = FromArgs {
+            symbol: None,
+            file: None,
+            module: None,
+            public_exports: false,
+            depth: Some(2),
+            format: OutputFormat::Human,
+        };
+
+        let result = resolve_from_args(args);
+        assert!(matches!(result, Err(FromArgsError::MissingTarget)));
+    }
+
+    #[test]
+    fn resolve_from_args_rejects_multiple_targets() {
+        let args = FromArgs {
+            symbol: Some("OrderService".to_string()),
+            file: None,
+            module: None,
+            public_exports: true,
+            depth: None,
+            format: OutputFormat::Human,
+        };
+
+        let result = resolve_from_args(args);
+        assert!(matches!(result, Err(FromArgsError::MultipleTargets)));
+    }
+
+    #[test]
+    fn resolve_from_args_accepts_single_target() {
+        let args = FromArgs {
+            symbol: Some("OrderService".to_string()),
+            file: None,
+            module: None,
+            public_exports: false,
+            depth: Some(1),
+            format: OutputFormat::Human,
+        };
+
+        let result = resolve_from_args(args);
+        assert!(matches!(
+            result,
+            Ok(ResolvedFromCommand {
+                target: QueryTarget::Symbol(_),
+                depth: Some(1),
+                format: OutputFormat::Human
+            })
+        ));
+    }
+}
