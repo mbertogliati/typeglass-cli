@@ -1,5 +1,10 @@
 # typeglass
 
+[![CI](https://github.com/YOUR_USERNAME/typeglass-cli/workflows/CI/badge.svg)](https://github.com/YOUR_USERNAME/typeglass-cli/actions)
+[![codecov](https://codecov.io/gh/YOUR_USERNAME/typeglass-cli/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/typeglass-cli)
+[![Crates.io](https://img.shields.io/crates/v/typeglass-cli.svg)](https://crates.io/crates/typeglass-cli)
+[![License](https://img.shields.io/crates/l/typeglass-cli.svg)](LICENSE)
+
 **Navigate type relationships lazily through LSP**
 
 `typeglass` is a CLI tool that builds type dependency graphs on-demand using Language Server Protocol (LSP). Instead of analyzing entire codebases upfront, it queries LSP servers lazily to explore type relationships as you navigate.
