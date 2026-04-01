@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn test_symbol_not_found_with_suggestions() {
         let suggestions = vec!["MyClass".to_string(), "MyStruct".to_string(), "MyInterface".to_string()];
-        let (summary, limitations, next_step) = symbol_not_found("MyType", suggestions);
+        let (summary, _limitations, next_step) = symbol_not_found("MyType", suggestions);
         
         assert!(summary.0.contains("MyType"));
         assert!(next_step.0.contains("Did you mean"));

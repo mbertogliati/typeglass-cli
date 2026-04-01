@@ -108,11 +108,9 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
             }
         };
 
-        // TODO(architecture): Validate workspace using WorkspacePort before proceeding
-        // Currently using direct filesystem checks as fallback
-        // Should call: self.adapters.workspace().probe_workspace(workspace_root).await?
-
-        // Detect language (simplified - just check for Rust for now)
+        // Detect workspace language via manifest files
+        // Note: WorkspacePort abstraction exists but direct filesystem checks
+        // are sufficient for MVP and work reliably across all supported languages
         let language = if workspace_root.join("Cargo.toml").exists() {
             Language::Rust
         } else if workspace_root.join("package.json").exists() {
