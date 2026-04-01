@@ -2,11 +2,11 @@
 name = "typeglass-cli"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Mateo Bertogliati <mateoezequiel.bertogliati@gmail.com>"]
 description = "Navigate type relationships lazily through LSP - CLI tool for exploring type dependencies on-demand"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/YOUR_USERNAME/typeglass-cli"
-homepage = "https://github.com/YOUR_USERNAME/typeglass-cli"
+repository = "https://github.com/mbertogliati/typeglass-cli"
+homepage = "https://github.com/mbertogliati/typeglass-cli"
 documentation = "https://docs.rs/typeglass-cli"
 readme = "README.md"
 keywords = ["lsp", "types", "graph", "cli", "analysis"]
@@ -14,6 +14,7 @@ categories = ["command-line-utilities", "development-tools"]
 exclude = [
     ".github/",
     "tests/fixtures/",
+    "test-fixtures/",
     "*.log",
 ]
 
