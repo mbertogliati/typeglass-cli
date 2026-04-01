@@ -1,9 +1,9 @@
 use typeglass_cli::application;
 use typeglass_cli::domain::language::Language;
 use typeglass_cli::infrastructure::cli;
+use typeglass_cli::infrastructure::cli::{UserRequest, OutputFormat};
 use typeglass_cli::infrastructure::adapters::WiredAdapters;
 use typeglass_cli::ux_model;
-use typeglass_cli::infrastructure::cli::UserRequest;
 use clap::Parser;
 use std::path::Path;
 
@@ -43,10 +43,10 @@ async fn main() {
     );
     
     match request {
-        UserRequest::From(req, json, _) => {
+        UserRequest::From(req, format, _) => {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
-            print_response(response, json);
+            print_from_response(response, format);
         }
         UserRequest::Gc(req, json, _) => {
             let (action, context) = req.into_parts();
@@ -67,6 +67,35 @@ async fn main() {
             let (action, context) = req.into_parts();
             let response = service.execute(action, context).await;
             print_response(response, json);
+        }
+    }
+}
+
+fn print_from_response<S, P, F>(response: ux_model::result::UserResult<S, P, F>, format: OutputFormat)
+where
+    S: ux_model::result::SuccessUserExpectations,
+    P: ux_model::result::PartialSuccessUserExpectations,
+    F: ux_model::result::FailureUserExpectations,
+{
+    
+    
+    match format {
+        OutputFormat::Human => {
+            print_response(response, false);
+        }
+        OutputFormat::Json => {
+            print_response(response, true);
+        }
+        OutputFormat::Dot | OutputFormat::Mermaid => {
+            // For now, just print human-readable
+            // TODO: Extract graph from response and format it
+            // This would require accessing the graph data from the response
+            // which needs deeper integration
+            eprintln!("⚠️  DOT and Mermaid output formats are not yet fully integrated.");
+            eprintln!("    Falling back to human-readable output.");
+            eprintln!("    To use these formats, pipe the JSON output to a separate tool:");
+            eprintln!("    typeglass from --symbol MyType --format json | typeglass-format --dot");
+            print_response(response, false);
         }
     }
 }

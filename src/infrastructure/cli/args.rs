@@ -95,12 +95,34 @@ How to find symbols:
     /// Maximum depth to traverse
     #[arg(long, help = "How many levels deep to traverse type relationships (default: 1)", default_value = "1")]
     pub depth: Option<u8>,
+    
+    /// Output format
+    #[arg(
+        long,
+        value_enum,
+        default_value = "human",
+        help = "Output format (human, json, dot, mermaid)"
+    )]
+    pub format: OutputFormat,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum OutputFormat {
+    /// Human-readable text output
+    Human,
+    /// JSON format
+    Json,
+    /// Graphviz DOT format
+    Dot,
+    /// Mermaid diagram format
+    Mermaid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedFromCommand {
     pub target: QueryTarget,
     pub depth: Option<u8>,
+    pub format: OutputFormat,
 }
 
 #[derive(Debug, Error)]
