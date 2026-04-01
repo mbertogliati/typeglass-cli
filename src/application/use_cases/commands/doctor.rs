@@ -24,7 +24,13 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandDoctor> for ApplicationSe
         let mut limitations = Vec::new();
 
         // Check all supported languages
-        let languages = [Language::TypeScript, Language::Rust, Language::Go];
+        let languages = [
+            Language::TypeScript,
+            Language::Rust,
+            Language::Go,
+            Language::Java,
+            Language::Kotlin,
+        ];
 
         for language in &languages {
             if let Some(config) = LspServerConfig::for_language(*language) {
