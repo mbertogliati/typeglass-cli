@@ -1,7 +1,7 @@
 use clap::Parser;
 use thiserror::Error;
 
-use super::types::{CliArgs, FromArgs, FromArgsError, QueryTarget, ResolvedFromCommand};
+use super::types::{CliArgs, FromArgs, FromArgsError, QueryTarget, ResolvedFromCommand, OutputFormat};
 use crate::infrastructure::cli::CliCommand;
 use crate::ux_model::intent::{
     UserCommandContext, UserCommandDoctor, UserCommandFrom, UserCommandGc, UserCommandInit,
@@ -33,6 +33,7 @@ pub fn resolve_from_args(args: FromArgs) -> Result<ResolvedFromCommand, FromArgs
         1 => Ok(ResolvedFromCommand {
             target: targets.remove(0),
             depth: args.depth,
+            format: args.format,
         }),
         _ => Err(FromArgsError::MultipleTargets),
     }
@@ -47,7 +48,7 @@ pub enum IntentResolutionError {
 }
 
 pub enum UserRequest {
-    From(crate::ux_model::intent::UserRequest<UserCommandFrom>, bool, bool), // json, debug
+    From(crate::ux_model::intent::UserRequest<UserCommandFrom>, OutputFormat, bool), // format, debug
     Gc(crate::ux_model::intent::UserRequest<UserCommandGc>, bool, bool),
     Doctor(crate::ux_model::intent::UserRequest<UserCommandDoctor>, bool, bool),
     Init(crate::ux_model::intent::UserRequest<UserCommandInit>, bool, bool),
@@ -80,7 +81,7 @@ pub fn resolve_intent(args: CliArgs) -> Result<UserRequest, IntentResolutionErro
                 QueryTarget::Module(module) => UserCommandFrom::module(module, resolved.depth),
                 QueryTarget::PublicExports => UserCommandFrom::public_exports(resolved.depth),
             };
-            Ok(UserRequest::From(crate::ux_model::intent::UserRequest::terminal(cmd, context), json_output, debug))
+            Ok(UserRequest::From(crate::ux_model::intent::UserRequest::terminal(cmd, context), resolved.format, debug))
         }
         CliCommand::Gc => {
             Ok(UserRequest::Gc(crate::ux_model::intent::UserRequest::terminal(UserCommandGc, context), json_output, debug))
@@ -109,6 +110,7 @@ mod tests {
             module: None,
             public_exports: false,
             depth: Some(2),
+            format: OutputFormat::Human,
         };
 
         let result = resolve_from_args(args);
@@ -123,6 +125,7 @@ mod tests {
             module: None,
             public_exports: true,
             depth: None,
+            format: OutputFormat::Human,
         };
 
         let result = resolve_from_args(args);
@@ -137,6 +140,7 @@ mod tests {
             module: None,
             public_exports: false,
             depth: Some(1),
+            format: OutputFormat::Human,
         };
 
         let result = resolve_from_args(args);
@@ -144,7 +148,8 @@ mod tests {
             result,
             Ok(ResolvedFromCommand {
                 target: QueryTarget::Symbol(_),
-                depth: Some(1)
+                depth: Some(1),
+                format: OutputFormat::Human
             })
         ));
     }
