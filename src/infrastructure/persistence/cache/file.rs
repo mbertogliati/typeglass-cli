@@ -192,10 +192,8 @@ impl GraphCache {
                         }
                     });
                     
-                    if should_invalidate {
-                        if std::fs::remove_file(&path).is_ok() {
-                            invalidated_count += 1;
-                        }
+                    if should_invalidate && std::fs::remove_file(&path).is_ok() {
+                        invalidated_count += 1;
                     }
                 }
             }
@@ -205,6 +203,7 @@ impl GraphCache {
     }
     
     /// Count cache entries (for metrics)
+    #[allow(dead_code)]
     fn count_entries(&self) -> usize {
         std::fs::read_dir(&self.cache_dir)
             .map(|entries| entries.filter_map(Result::ok).count())
