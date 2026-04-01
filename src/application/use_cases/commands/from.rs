@@ -117,6 +117,25 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
             Language::TypeScript
         } else if workspace_root.join("go.mod").exists() {
             Language::Go
+        } else if workspace_root.join("pom.xml").exists()
+            || workspace_root.join("build.gradle").exists()
+            || workspace_root.join("build.gradle.kts").exists()
+        {
+            // Check if it's Kotlin or Java based on source files
+            let has_kotlin = std::fs::read_dir(&workspace_root)
+                .ok()
+                .and_then(|entries| {
+                    entries
+                        .filter_map(Result::ok)
+                        .find(|e| e.path().extension().and_then(|s| s.to_str()) == Some("kt"))
+                })
+                .is_some();
+            
+            if has_kotlin {
+                Language::Kotlin
+            } else {
+                Language::Java
+            }
         } else {
             return UserResult::Failure(crate::application::types::GenericFailure {
                 promises: vec![
@@ -125,10 +144,14 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
                 ],
                 summary: UserSummary("Could not detect project language".to_string()),
                 limitations: vec![
-                    UserLimitation("No Cargo.toml, package.json, or go.mod found".to_string()),
+                    UserLimitation(
+                        "No manifest file found (Cargo.toml, package.json, go.mod, pom.xml, build.gradle)"
+                            .to_string(),
+                    ),
                 ],
                 next_step: UserNextStep(
-                    "Run from a Rust, TypeScript, or Go project root directory".to_string(),
+                    "Run from a Rust, TypeScript, Go, Java, or Kotlin project root directory"
+                        .to_string(),
                 ),
                 context: UserResultContext {
                     command_context: context,

@@ -59,6 +59,31 @@ impl LspServerConfig {
                     "go install golang.org/x/tools/gopls@latest\n\
                      Or: https://github.com/golang/tools/tree/master/gopls",
             }),
+            Language::Java => Some(Self {
+                language: Language::Java,
+                name: "jdtls",
+                command: "jdtls",
+                args: &[],
+                install_instructions:
+                    "Download from: https://download.eclipse.org/jdtls/snapshots/\n\
+                     Or use mason.nvim, or install via package manager:\n\
+                     - macOS: brew install jdtls\n\
+                     - Arch: yay -S jdtls\n\
+                     Documentation: https://github.com/eclipse-jdtls/eclipse.jdt.ls",
+            }),
+            Language::Kotlin => Some(Self {
+                language: Language::Kotlin,
+                name: "kotlin-language-server",
+                command: "kotlin-language-server",
+                args: &[],
+                install_instructions:
+                    "Download from: https://github.com/fwcd/kotlin-language-server/releases\n\
+                     Or build from source:\n\
+                     git clone https://github.com/fwcd/kotlin-language-server\n\
+                     cd kotlin-language-server\n\
+                     ./gradlew :server:installDist\n\
+                     Add server/build/install/server/bin to PATH",
+            }),
         }
     }
 

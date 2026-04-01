@@ -221,6 +221,8 @@ fn lsp_binary_name(language: &Language) -> &'static str {
         Language::Rust => "rust-analyzer",
         Language::TypeScript => "typescript-language-server",
         Language::Go => "gopls",
+        Language::Java => "jdtls",
+        Language::Kotlin => "kotlin-language-server",
     }
 }
 
@@ -230,6 +232,8 @@ fn lsp_install_command(language: &Language) -> &'static str {
         Language::Rust => "rustup component add rust-analyzer",
         Language::TypeScript => "npm install -g typescript-language-server typescript",
         Language::Go => "go install golang.org/x/tools/gopls@latest",
+        Language::Java => "brew install jdtls  # or download from eclipse.org/jdtls",
+        Language::Kotlin => "Download from github.com/fwcd/kotlin-language-server/releases",
     }
 }
 

@@ -12,7 +12,7 @@
 ## Features
 
 - 🔍 **Lazy graph building** - Query type dependencies on-demand via LSP
-- 🌐 **Multi-language support** - Works with any language that has an LSP server (Rust, TypeScript, Go, etc.)
+- 🌐 **Multi-language support** - Rust, TypeScript, Go, Java, Kotlin (any language with LSP server)
 - 🧬 **Semantic relationships** - Accurate EdgeKind detection (Extends, Implements, Instantiates, Contains) via hover analysis
 - 📊 **Multiple output formats** - Human-readable, JSON, Graphviz DOT, and Mermaid diagrams
 - 🔄 **Recursive traversal** - BFS traversal with configurable depth
@@ -45,6 +45,8 @@ Install a language server for your target language:
 - **Rust**: `rustup component add rust-analyzer`
 - **TypeScript**: `npm install -g typescript-language-server typescript`
 - **Go**: `go install golang.org/x/tools/gopls@latest`
+- **Java**: `brew install jdtls` or download from [eclipse.org/jdtls](https://download.eclipse.org/jdtls/snapshots/)
+- **Kotlin**: Download from [kotlin-language-server releases](https://github.com/fwcd/kotlin-language-server/releases)
 
 ## Usage
 

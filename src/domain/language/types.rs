@@ -9,6 +9,8 @@ pub enum Language {
     TypeScript,
     Rust,
     Go,
+    Java,
+    Kotlin,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
