@@ -122,12 +122,33 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
             || workspace_root.join("build.gradle.kts").exists()
         {
             // Check if it's Kotlin or Java based on source files
+            // Look for .kt files recursively in common source directories
             let has_kotlin = std::fs::read_dir(&workspace_root)
                 .ok()
                 .and_then(|entries| {
                     entries
                         .filter_map(Result::ok)
-                        .find(|e| e.path().extension().and_then(|s| s.to_str()) == Some("kt"))
+                        .find(|e| {
+                            let path = e.path();
+                            // Check if file has .kt extension
+                            if path.extension().and_then(|s| s.to_str()) == Some("kt") {
+                                return true;
+                            }
+                            // Check src/ directory for .kt files
+                            if path.is_dir() && path.file_name().and_then(|s| s.to_str()) == Some("src") {
+                                return std::fs::read_dir(&path)
+                                    .ok()
+                                    .map(|src_entries| {
+                                        src_entries.filter_map(Result::ok).any(|src_entry| {
+                                            let src_path = src_entry.path();
+                                            src_path.extension().and_then(|s| s.to_str()) == Some("kt")
+                                                || (src_path.is_dir() && has_kt_files_recursive(&src_path, 2))
+                                        })
+                                    })
+                                    .unwrap_or(false);
+                            }
+                            false
+                        })
                 })
                 .is_some();
             
@@ -264,5 +285,26 @@ impl<A: ApplicationAdapters> ActionExecutor<UserCommandFrom> for ApplicationServ
             }
         }
     }
+}
+
+/// Helper function to recursively check for .kt files
+fn has_kt_files_recursive(dir: &std::path::Path, max_depth: usize) -> bool {
+    if max_depth == 0 {
+        return false;
+    }
+    
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("kt") {
+                return true;
+            }
+            if path.is_dir() && has_kt_files_recursive(&path, max_depth - 1) {
+                return true;
+            }
+        }
+    }
+    
+    false
 }
 

@@ -147,6 +147,60 @@ mod tests {
     }
 
     #[test]
+    fn test_java_config() {
+        let config = LspServerConfig::for_language(Language::Java).unwrap();
+        assert_eq!(config.language, Language::Java);
+        assert_eq!(config.name, "jdtls");
+        assert_eq!(config.command, "jdtls");
+        assert!(
+            config.install_instructions.contains("eclipse.org/jdtls")
+                || config.install_instructions.contains("brew install jdtls"),
+            "Java install instructions should mention eclipse.org/jdtls or brew"
+        );
+    }
+
+    #[test]
+    fn test_kotlin_config() {
+        let config = LspServerConfig::for_language(Language::Kotlin).unwrap();
+        assert_eq!(config.language, Language::Kotlin);
+        assert_eq!(config.name, "kotlin-language-server");
+        assert_eq!(config.command, "kotlin-language-server");
+        assert!(
+            config.install_instructions.contains("kotlin-language-server/releases"),
+            "Kotlin install instructions should mention releases page"
+        );
+    }
+
+    #[test]
+    fn test_all_languages_have_lsp_config() {
+        // Ensure every Language variant has an LSP config
+        let languages = [
+            Language::Rust,
+            Language::TypeScript,
+            Language::Go,
+            Language::Java,
+            Language::Kotlin,
+        ];
+
+        for lang in &languages {
+            let config = LspServerConfig::for_language(*lang);
+            assert!(
+                config.is_some(),
+                "Language {:?} should have LSP config",
+                lang
+            );
+
+            let config = config.unwrap();
+            assert!(!config.name.is_empty(), "LSP name should not be empty");
+            assert!(!config.command.is_empty(), "LSP command should not be empty");
+            assert!(
+                !config.install_instructions.is_empty(),
+                "Install instructions should not be empty"
+            );
+        }
+    }
+
+    #[test]
     fn test_check_installation_for_existing_binary() {
         // This test will vary by environment, but we can test the mechanism
         let config = LspServerConfig {

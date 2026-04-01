@@ -146,9 +146,75 @@ fn detect_language(workspace_root: &Path) -> Language {
         Language::TypeScript
     } else if workspace_root.join("go.mod").exists() {
         Language::Go
+    } else if workspace_root.join("pom.xml").exists()
+        || workspace_root.join("build.gradle").exists()
+        || workspace_root.join("build.gradle.kts").exists()
+    {
+        // Check if it's Kotlin or Java based on source files
+        if has_kotlin_files(workspace_root) {
+            Language::Kotlin
+        } else {
+            Language::Java
+        }
     } else {
         // Default to Rust if detection fails
         eprintln!("Warning: Could not detect language, defaulting to Rust");
         Language::Rust
     }
+}
+
+/// Check if workspace contains Kotlin files
+fn has_kotlin_files(workspace_root: &Path) -> bool {
+    // Check for .kt files in root
+    if let Ok(entries) = std::fs::read_dir(workspace_root) {
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("kt") {
+                return true;
+            }
+            // Check src/ directory
+            if path.is_dir() && path.file_name().and_then(|s| s.to_str()) == Some("src") {
+                if has_kt_files_in_src(&path) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn has_kt_files_in_src(src_dir: &Path) -> bool {
+    if let Ok(entries) = std::fs::read_dir(src_dir) {
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("kt") {
+                return true;
+            }
+            if path.is_dir() {
+                // Check subdirectories (main/kotlin, etc.)
+                if has_kt_files_recursive(&path, 2) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn has_kt_files_recursive(dir: &Path, max_depth: usize) -> bool {
+    if max_depth == 0 {
+        return false;
+    }
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("kt") {
+                return true;
+            }
+            if path.is_dir() && has_kt_files_recursive(&path, max_depth - 1) {
+                return true;
+            }
+        }
+    }
+    false
 }
