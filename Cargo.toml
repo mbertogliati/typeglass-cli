@@ -42,3 +42,8 @@ tempfile = "3"
 assert_cmd = "2.0"
 predicates = "3.0"
 dirs = "5.0"
+criterion = "0.5"
+
+[[bench]]
+name = "graph_traversal"
+harness = false
