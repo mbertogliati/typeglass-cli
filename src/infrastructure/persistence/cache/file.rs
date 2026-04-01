@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use crate::domain::graph::{
     TraversalDirection, TypeGraph,
@@ -15,6 +16,15 @@ pub struct GraphCache {
 struct CacheEntry {
     graph: TypeGraph,
     cached_at: SystemTime,
+    /// Files that were analyzed to build this graph (with their hashes)
+    source_files: Vec<SourceFileInfo>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct SourceFileInfo {
+    path: PathBuf,
+    /// Simple hash of file modification time
+    mtime_hash: u64,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -88,7 +98,7 @@ impl GraphCache {
         Ok(entry.graph)
     }
     
-    /// Store graph in cache
+    /// Store graph in cache with source file tracking
     pub fn set(
         &self,
         symbol: &str,
@@ -98,9 +108,13 @@ impl GraphCache {
     ) -> Result<(), CacheError> {
         let path = self.cache_path(symbol, depth, direction);
         
+        // Extract source files from graph nodes
+        let source_files = extract_source_files(graph);
+        
         let entry = CacheEntry {
             graph: graph.clone(),
             cached_at: SystemTime::now(),
+            source_files,
         };
         
         let content = serde_json::to_string_pretty(&entry)
@@ -139,15 +153,55 @@ impl GraphCache {
         Ok(())
     }
     
-    /// Invalidate cache entries for specific files
-    /// Currently invalidates ALL cache (conservative approach)
-    /// TODO: Track which symbols come from which files for selective invalidation
-    pub fn clear_for_files(&self, _files: &[PathBuf]) -> Result<usize, CacheError> {
-        // Conservative: Clear entire cache when any file changes
-        // Reasoning: TypeGraph can span multiple files, hard to track exact dependencies
-        let entries_before = self.count_entries();
-        self.clear()?;
-        Ok(entries_before)
+    /// Invalidate cache entries for specific files (selective invalidation)
+    /// Removes only cache entries that depend on the modified files
+    pub fn clear_for_files(&self, files: &[PathBuf]) -> Result<usize, CacheError> {
+        if files.is_empty() {
+            return Ok(0);
+        }
+        
+        let mut invalidated_count = 0;
+        let changed_files: HashSet<PathBuf> = files.iter().cloned().collect();
+        
+        // Scan all cache files
+        let entries = match std::fs::read_dir(&self.cache_dir) {
+            Ok(entries) => entries,
+            Err(_) => return Ok(0), // No cache dir, nothing to invalidate
+        };
+        
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() || path.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
+            }
+            
+            // Read cache entry to check source files
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(cache_entry) = serde_json::from_str::<CacheEntry>(&content) {
+                    // Check if any source file has changed
+                    let should_invalidate = cache_entry.source_files.iter().any(|sf| {
+                        // Check if file is in changed set
+                        if !changed_files.contains(&sf.path) {
+                            return false;
+                        }
+                        
+                        // Check if file modification time changed
+                        match get_file_mtime_hash(&sf.path) {
+                            Ok(current_hash) => current_hash != sf.mtime_hash,
+                            Err(_) => true, // File doesn't exist or can't be read, invalidate
+                        }
+                    });
+                    
+                    if should_invalidate {
+                        if std::fs::remove_file(&path).is_ok() {
+                            invalidated_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(invalidated_count)
     }
     
     /// Count cache entries (for metrics)
@@ -155,6 +209,39 @@ impl GraphCache {
         std::fs::read_dir(&self.cache_dir)
             .map(|entries| entries.filter_map(Result::ok).count())
             .unwrap_or(0)
+    }
+}
+
+/// Extract unique source files from graph nodes
+fn extract_source_files(graph: &TypeGraph) -> Vec<SourceFileInfo> {
+    let mut seen = HashSet::new();
+    let mut files = Vec::new();
+    
+    for node in graph.nodes().values() {
+        let file_path = &node.location.file;
+        
+        if seen.insert(file_path.clone()) {
+            if let Ok(hash) = get_file_mtime_hash(file_path) {
+                files.push(SourceFileInfo {
+                    path: file_path.clone(),
+                    mtime_hash: hash,
+                });
+            }
+        }
+    }
+    
+    files
+}
+
+/// Get file modification time hash (simple u64 from SystemTime)
+fn get_file_mtime_hash(path: &PathBuf) -> Result<u64, std::io::Error> {
+    let metadata = std::fs::metadata(path)?;
+    let mtime = metadata.modified()?;
+    
+    // Convert SystemTime to u64 (seconds since UNIX_EPOCH)
+    match mtime.duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(duration) => Ok(duration.as_secs()),
+        Err(_) => Ok(0), // File modified before UNIX_EPOCH (unlikely)
     }
 }
 
