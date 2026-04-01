@@ -42,15 +42,16 @@ fn test_from_command_with_symbol() {
 
 #[test]
 fn test_from_command_with_depth() {
+    // Use a real symbol from the project
     let mut cmd = Command::cargo_bin("typeglass").unwrap();
     cmd.arg("from")
         .arg("--symbol")
-        .arg("TypeA")
+        .arg("TypeGraph")  // Exists in our codebase
         .arg("--depth")
-        .arg("3")
+        .arg("2")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Found").or(predicate::str::contains("Failed")));
+        .stdout(predicate::str::contains("TypeGraph"));
 }
 
 #[test]

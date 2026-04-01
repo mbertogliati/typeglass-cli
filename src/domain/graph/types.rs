@@ -15,6 +15,9 @@ mod tests_traversal_engine;
 #[path = "tests_edgekind.rs"]
 #[cfg(test)]
 mod tests_edgekind;
+#[path = "tests_graph_operations.rs"]
+#[cfg(test)]
+mod tests_graph_operations;
 #[path = "formatters_impl/mod.rs"]
 pub mod formatters;
 
