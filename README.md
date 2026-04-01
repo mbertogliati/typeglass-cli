@@ -13,18 +13,38 @@
 
 - 🔍 **Lazy graph building** - Query type dependencies on-demand via LSP
 - 🌐 **Multi-language support** - Works with any language that has an LSP server (Rust, TypeScript, Go, etc.)
-- 📊 **Real edges** - Constructs TypeEdge connections via `textDocument/references`
+- 🧬 **Semantic relationships** - Accurate EdgeKind detection (Extends, Implements, Instantiates, Contains) via hover analysis
+- 📊 **Multiple output formats** - Human-readable, JSON, Graphviz DOT, and Mermaid diagrams
 - 🔄 **Recursive traversal** - BFS traversal with configurable depth
 - 🎯 **Cycle detection** - Prevents infinite loops with visited tracking
 - 💾 **Smart caching** - File-based cache with 5-minute TTL
 - 🏥 **Health checks** - `doctor` command verifies LSP availability
+- 💬 **Helpful errors** - Clear error messages with actionable next steps
 
 ## Installation
 
+### From crates.io
+
 ```bash
+cargo install typeglass-cli
+```
+
+### From source
+
+```bash
+git clone https://github.com/YOUR_USERNAME/typeglass-cli
+cd typeglass-cli
 cargo build --release
 # Binary available at target/release/typeglass
 ```
+
+### Prerequisites
+
+Install a language server for your target language:
+
+- **Rust**: `rustup component add rust-analyzer`
+- **TypeScript**: `npm install -g typescript-language-server typescript`
+- **Go**: `go install golang.org/x/tools/gopls@latest`
 
 ## Usage
 
@@ -34,7 +54,7 @@ cargo build --release
 typeglass doctor
 ```
 
-Verifies that required LSP servers are installed (e.g., `rust-analyzer`, `typescript-language-server`).
+Verifies that required LSP servers are installed and accessible in PATH.
 
 ### Navigate Type Graph
 
@@ -52,6 +72,39 @@ typeglass from --module src/domain --depth 3
 typeglass from --public-exports --depth 1
 ```
 
+### Output Formats
+
+TypeGlass supports multiple output formats for different use cases:
+
+```bash
+# Human-readable (default)
+typeglass from --symbol MyType
+
+# JSON for programmatic processing
+typeglass from --symbol MyType --format json
+
+# Graphviz DOT for visualization
+typeglass from --symbol MyType --format dot > graph.dot
+dot -Tpng graph.dot -o graph.png
+
+# Mermaid diagrams for documentation
+typeglass from --symbol MyType --format mermaid > graph.mmd
+```
+
+### Clear Cache
+
+```bash
+# Clear cached graph data
+typeglass gc
+```
+
+### Initialize Configuration
+
+```bash
+# Create .typeglass.toml config file
+typeglass init
+```
+
 ### Get Help
 
 ```bash
@@ -64,43 +117,78 @@ typeglass from --help
 
 ## Example Output
 
+### Human-readable format
 ```bash
 $ typeglass from --symbol TypeGraph --depth 2
+✅ Built graph from 'TypeGraph' with 15 nodes and 23 edges (depth: 2, language: Rust)
 ```
 
+### JSON format
+```bash
+$ typeglass from --symbol TypeGraph --format json
+```
 ```json
 {
-  "status": "Success",
-  "summary": "Found 2 nodes and 20 edges from 'TypeGraph' (complete graph, language: Rust)"
+  "nodes": [
+    {
+      "name": "TypeGraph",
+      "kind": "Struct",
+      "location": { "file": "src/domain/graph.rs", "line": 42 }
+    }
+  ],
+  "edges": [
+    {
+      "from": "TypeGraph",
+      "to": "TypeNode",
+      "kind": "Contains"
+    },
+    {
+      "from": "MyStruct",
+      "to": "MyTrait",
+      "kind": "Extends"
+    }
+  ]
+}
+```
+
+### DOT format
+```bash
+$ typeglass from --symbol TypeGraph --format dot
+digraph TypeGraph {
+  rankdir=TB;
+  TypeGraph [label="TypeGraph", shape=box];
+  TypeNode [label="TypeNode", shape=box];
+  TypeGraph -> TypeNode [label="contains"];
 }
 ```
 
 ## How It Works
 
-1. **LSP Initialization**: Starts and initializes LSP server for detected language
-2. **Symbol Finding**: Uses `workspace/symbol` to locate type definitions
-3. **Reference Tracking**: Queries `textDocument/references` to find usages
-4. **Edge Construction**: Builds TypeEdge connections between symbols
-5. **Recursive Traversal**: BFS traversal up to specified depth, preventing cycles
+1. **Language Detection**: Auto-detects project language (Rust/TypeScript/Go) from workspace markers
+2. **LSP Initialization**: Starts and initializes LSP server for detected language
+3. **Symbol Finding**: Uses `workspace/symbol` to locate type definitions
+4. **Semantic Analysis**: Queries `textDocument/hover` to infer relationship types
+5. **Edge Construction**: Builds TypeEdge with semantic EdgeKind (Extends, Implements, Instantiates, Contains)
+6. **Reference Tracking**: Queries `textDocument/references` to find usages
+7. **Recursive Traversal**: BFS traversal up to specified depth, preventing cycles
+8. **Smart Caching**: Caches results with 5-minute TTL for faster subsequent queries
 
 ## Architecture
 
 Follows hexagonal architecture with strict type-level domain modeling:
 
-- **Domain**: 34+ types encoding business rules
-- **Ports**: Input/output interfaces for adapters
-- **Infrastructure**: LSP, cache, and filesystem adapters
-- **Principles**: Monomorfización (no `dyn`), Curry-Howard compliance, smart constructors
+- **Domain**: Pure business logic with 40+ types
+- **Application**: Use cases and command handlers
+- **Infrastructure**: LSP client, cache, filesystem, CLI adapters
+- **Principles**: Hexagonal ports & adapters, type-driven design
+
+Key design decisions:
+- **Lazy evaluation**: Build graph incrementally, not upfront
+- **LSP-native**: Use language servers for accurate analysis
+- **Semantic relationships**: Infer EdgeKind from hover responses
+- **Multi-language**: Pluggable language support via LSP
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
-
-## Requirements
-
-- Rust 1.70+
-- LSP server for your language:
-  - Rust: `rust-analyzer` (install with `rustup component add rust-analyzer`)
-  - TypeScript: `typescript-language-server` (install with `npm install -g typescript-language-server`)
-  - Go: `gopls` (install with `go install golang.org/x/tools/gopls@latest`)
 
 ## Development
 
@@ -108,35 +196,81 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 # Build
 cargo build
 
-# Run tests (146 passing)
+# Run tests (374 passing, >60% coverage)
 cargo test
+
+# Run clippy
+cargo clippy --all-targets -- -D warnings
+
+# Generate coverage report
+cargo tarpaulin
 
 # Run CLI
 cargo run -- from --symbol TypeName --depth 2
 ```
 
-## Current Limitations
+## Testing
 
-- Symbol resolution uses file path heuristic (not 100% accurate)
-- EdgeKind is simplified (always `Contains`, needs semantic analysis)
-- Limited to 10 references per symbol (prevents explosion)
-- Hover parsing not yet implemented (would improve accuracy)
+The project has comprehensive test coverage:
+- 346+ unit tests for core logic
+- 26 integration tests for CLI commands
+- 12 error template tests
+- 21 formatter tests
+
+Run specific test suites:
+```bash
+# Unit tests only
+cargo test --lib
+
+# Integration tests only
+cargo test --test cli_integration_test
+
+# Formatter tests
+cargo test formatters
+
+# With coverage
+cargo tarpaulin --out Html
+```
 
 ## Roadmap
 
-- [ ] Improve symbol resolution (parse hover responses)
-- [ ] Semantic EdgeKind detection (Contains vs Extends vs Instantiates)
-- [ ] Output formats (dot, mermaid, detailed JSON)
-- [ ] TypeScript and Go LSP testing
-- [ ] Interactive exploration mode
-- [ ] Performance optimizations
+### ✅ Completed
+- [x] Semantic EdgeKind detection (Extends, Implements, Instantiates)
+- [x] Output formats (DOT, Mermaid)
+- [x] Comprehensive error messages with next steps
+- [x] CI/CD pipeline with GitHub Actions
+- [x] Release automation
+
+### 🚧 In Progress  
+- [ ] TypeScript and Go integration tests
+- [ ] Performance benchmarks
+- [ ] Selective cache invalidation
+
+### 📅 Planned
+- [ ] Interactive exploration mode improvements
+- [ ] VSCode extension
+- [ ] Graph visualization server
+- [ ] Query language for filtering
+
+## Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass and clippy is clean
+5. Submit a pull request
+
+See [RELEASING.md](RELEASING.md) for release process.
 
 ## Documentation
 
-- `CONTEXT.md`: Design conversation history
-- `ARCHITECTURE.md`: Hexagonal architecture details
-- `LSP_ISSUES.md`: LSP integration challenges and solutions
+- [README.md](README.md): This file
+- [ARCHITECTURE.md](ARCHITECTURE.md): Architecture deep dive
+- [RELEASING.md](RELEASING.md): Release process
+- [CHANGELOG.md](CHANGELOG.md): Version history
+- [LSP_ISSUES.md](LSP_ISSUES.md): LSP integration notes (if exists)
 
 ## License
 
-MIT
+Dual licensed under MIT OR Apache-2.0.
